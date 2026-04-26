@@ -1,0 +1,31 @@
+services:
+  gateway:
+    build: ./gateway
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth
+      - catalogo
+      - deudas
+      - pagos
+      - reportes
+  auth:
+    build: ./auth
+    ports:
+      - "3001:3000"
+  catalogo:
+    build: ./catalogo
+    ports:
+      - "3002:3000"
+  deudas:
+    build: ./deudas
+    ports:
+      - "3003:3000"
+  pagos:
+    build: ./pagos
+    ports:
+      - "3004:3000"
+  reportes:
+    build: ./reportes
+    ports:
+      - "3005:3000"
