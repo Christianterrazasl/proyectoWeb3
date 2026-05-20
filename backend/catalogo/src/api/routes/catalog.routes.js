@@ -1,10 +1,9 @@
-// src/api/routes/catalog.routes.ts
 import { Router } from "express";
-import { CompanyController } from "../controllers/CompanyController";
-import { CompanyRepositoryImpl } from "../../infrastructure/repositories_impl/CompanyRepositoryImpl";
-import { CreateCompanyCommandHandler } from "../../application/commands/CreateCompanyCommand";
-import { ServiceRepositoryImpl } from "../../infrastructure/repositories_impl/ServiceRepositoryImpl";
-import { CreateServiceCommandHandler } from "../../application/commands/CreateServiceCommand";
+import { CompanyController } from "../controllers/CompanyController.js";
+import { CompanyRepositoryImpl } from "../../infrastructure/repositories_impl/CompanyRepositoryImpl.js";
+import { CreateCompanyCommandHandler } from "../../application/commands/CreateCompanyCommand.js";
+import { ServiceRepositoryImpl } from "../../infrastructure/repositories_impl/ServiceRepositoryImpl.js";
+import { CreateServiceCommandHandler } from "../../application/commands/CreateServiceCommand.js";
 
 const router = Router();
 

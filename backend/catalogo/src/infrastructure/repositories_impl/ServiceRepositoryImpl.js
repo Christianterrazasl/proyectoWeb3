@@ -1,19 +1,19 @@
-// src/infrastructure/repositories_impl/ServiceRepositoryImpl.ts
-import { IServiceRepository } from "../../domain/repositories/IServiceRepository";
-import { Service } from "../../domain/models/Service";
-import { AppDataSource } from "../database/connection";
-import { ServiceEntity } from "../database/postgres/ServiceEntity";
-import { CompanyEntity } from "../database/postgres/CompanyEntity";
-import { CatalogServiceModel } from "../database/mongodb/CatalogServiceSchema";
+import { Service } from "../../domain/models/Service.js";
+import { AppDataSource } from "../database/connection.js";
+import { ServiceEntity } from "../database/postgres/ServiceEntity.js";
+import { CompanyEntity } from "../database/postgres/CompanyEntity.js";
+import { CatalogServiceModel } from "../database/mongodb/CatalogServiceSchema.js";
 
 /**
  * Implementación concreta del Repositorio de Servicios.
  */
-export class ServiceRepositoryImpl implements IServiceRepository {
-  private pgServiceRepo = AppDataSource.getRepository(ServiceEntity);
-  private pgCompanyRepo = AppDataSource.getRepository(CompanyEntity);
+export class ServiceRepositoryImpl {
+  constructor() {
+    this.pgServiceRepo = AppDataSource.getRepository(ServiceEntity);
+    this.pgCompanyRepo = AppDataSource.getRepository(CompanyEntity);
+  }
 
-  async save(service: Service): Promise<void> {
+  async save(service) {
     // 1. Validar integridad referencial cruzada (Asegurarnos de que el ID de empresa no es inventado)
     const company = await this.pgCompanyRepo.findOneBy({
       id: service.companyId,
@@ -47,7 +47,7 @@ export class ServiceRepositoryImpl implements IServiceRepository {
     );
   }
 
-  async findByCompanyId(companyId: string): Promise<Service[]> {
+  async findByCompanyId(companyId) {
     // Pendiente de implementar si requerimos filtrar desde Postgres internamente
     return [];
   }

@@ -1,8 +1,8 @@
 import { DataSource } from "typeorm";
 import mongoose from "mongoose";
-import { CompanyEntity } from "./postgres/CompanyEntity";
-import { ServiceEntity } from "./postgres/ServiceEntity";
-import * as dotenv from "dotenv";
+import { CompanyEntity } from "./postgres/CompanyEntity.js";
+import { ServiceEntity } from "./postgres/ServiceEntity.js";
+import dotenv from "dotenv";
 
 dotenv.config();
 

@@ -1,24 +1,15 @@
-// src/application/commands/CreateServiceCommand.ts
-import { Service, IInputSchemaField } from "../../domain/models/Service";
-import { IServiceRepository } from "../../domain/repositories/IServiceRepository";
-
-/**
- * DTO para la creación de un nuevo servicio asociado a una empresa.
- * Garantiza la estructura requerida para configurar el input_schema dinámico del frontend.
- */
-export interface CreateServiceDTO {
-  companyId: string;
-  name: string;
-  fields: IInputSchemaField[];
-}
+import { Service } from "../../domain/models/Service.js";
 
 /**
  * Caso de Uso: Registrar un nuevo servicio en el catálogo de Multipagos.
+ * DTO esperado en el execute: { companyId, name, fields }
  */
 export class CreateServiceCommandHandler {
-  constructor(private readonly serviceRepository: IServiceRepository) {}
+  constructor(serviceRepository) {
+    this.serviceRepository = serviceRepository;
+  }
 
-  async execute(dto: CreateServiceDTO): Promise<Service> {
+  async execute(dto) {
     // Validamos que el servicio contenga al menos un campo de identificación (ej. nro_cliente)
     if (!dto.companyId || !dto.name || !dto.fields || dto.fields.length === 0) {
       throw new Error(

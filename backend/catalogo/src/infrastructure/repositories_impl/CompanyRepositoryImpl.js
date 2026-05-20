@@ -1,22 +1,22 @@
-// src/infrastructure/repositories_impl/CompanyRepositoryImpl.ts
-import { ICompanyRepository } from "../../domain/repositories/ICompanyRepository";
-import { Company } from "../../domain/models/Company";
-import { AppDataSource } from "../database/connection";
-import { CompanyEntity } from "../database/postgres/CompanyEntity";
-import { CompanyModel } from "../database/mongodb/CompanySchema";
+import { Company } from "../../domain/models/Company.js";
+import { AppDataSource } from "../database/connection.js";
+import { CompanyEntity } from "../database/postgres/CompanyEntity.js";
+import { CompanyModel } from "../database/mongodb/CompanySchema.js";
 
 /**
  * Implementación concreta del Repositorio de Empresas.
  * EQUIPO: Aquí gestionamos la arquitectura Polyglot Persistence (Postgres + Mongo).
  */
-export class CompanyRepositoryImpl implements ICompanyRepository {
-  private pgRepository = AppDataSource.getRepository(CompanyEntity);
+export class CompanyRepositoryImpl {
+  constructor() {
+    this.pgRepository = AppDataSource.getRepository(CompanyEntity);
+  }
 
   /**
    * COMANDO DE ESCRITURA
    * Guarda en PostgreSQL primero (transaccionalidad estricta) y luego sincroniza hacia MongoDB (proyección).
    */
-  async save(company: Company): Promise<void> {
+  async save(company) {
     // 1. Persistencia estricta en la fuente de la verdad (Postgres)
     const pgCompany = this.pgRepository.create({
       id: company.id,
@@ -43,7 +43,7 @@ export class CompanyRepositoryImpl implements ICompanyRepository {
     );
   }
 
-  async update(company: Company): Promise<void> {
+  async update(company) {
     await this.pgRepository.save(company);
     await CompanyModel.findOneAndUpdate(
       { companyId: company.id },
@@ -53,28 +53,28 @@ export class CompanyRepositoryImpl implements ICompanyRepository {
 
   // === QUERIES INTERNAS PARA LÓGICA DE NEGOCIO (Usan Postgres para evitar latencia de sincronización) ===
 
-  async findByNit(nit: string): Promise<Company | null> {
+  async findByNit(nit) {
     const pgCompany = await this.pgRepository.findOneBy({ nit });
     if (!pgCompany) return null;
     return new Company(
       pgCompany.id,
       pgCompany.name,
       pgCompany.nit,
-      pgCompany.status as any,
+      pgCompany.status,
       pgCompany.createdAt,
       pgCompany.updatedAt,
       pgCompany.logoUrl,
     );
   }
 
-  async findById(id: string): Promise<Company | null> {
+  async findById(id) {
     const pgCompany = await this.pgRepository.findOneBy({ id });
     if (!pgCompany) return null;
     return new Company(
       pgCompany.id,
       pgCompany.name,
       pgCompany.nit,
-      pgCompany.status as any,
+      pgCompany.status,
       pgCompany.createdAt,
       pgCompany.updatedAt,
       pgCompany.logoUrl,
@@ -85,7 +85,7 @@ export class CompanyRepositoryImpl implements ICompanyRepository {
    * QUERY DE LECTURA PÚBLICA
    * Para alimentar el frontend rápidamente, leemos directamente de MongoDB.
    */
-  async findAll(): Promise<Company[]> {
+  async findAll() {
     const mongoDocs = await CompanyModel.find({ status: "ACTIVE" }).lean();
 
     return mongoDocs.map(
@@ -94,7 +94,7 @@ export class CompanyRepositoryImpl implements ICompanyRepository {
           doc.companyId,
           doc.name,
           doc.nit,
-          doc.status as any,
+          doc.status,
           new Date(),
           new Date(),
           doc.logoUrl,

@@ -1,26 +1,17 @@
-// src/application/commands/CreateCompanyCommand.ts
-import { Company } from "../../domain/models/Company";
-import { ICompanyRepository } from "../../domain/repositories/ICompanyRepository";
-
-/**
- * DTO (Data Transfer Object) para la creación de empresas.
- * Define el contrato estricto de los datos que la capa de presentación debe enviar a este caso de uso.
- */
-export interface CreateCompanyDTO {
-  name: string;
-  nit: string;
-  logoUrl?: string;
-}
+import { Company } from "../../domain/models/Company.js";
 
 /**
  * Caso de Uso: Registrar una nueva empresa.
  * Orquesta las validaciones de negocio y delega la persistencia al repositorio.
+ * DTO esperado en el execute: { name, nit, logoUrl }
  */
 export class CreateCompanyCommandHandler {
-  // El repositorio se inyecta como interfaz para mantener el principio de inversión de dependencias.
-  constructor(private readonly companyRepository: ICompanyRepository) {}
+  // El repositorio se inyecta para mantener el principio de inversión de dependencias.
+  constructor(companyRepository) {
+    this.companyRepository = companyRepository;
+  }
 
-  async execute(dto: CreateCompanyDTO): Promise<Company> {
+  async execute(dto) {
     // Validaciones estructurales básicas
     if (!dto.name || !dto.nit) {
       throw new Error("El nombre y el NIT son obligatorios.");

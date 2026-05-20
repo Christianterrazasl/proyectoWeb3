@@ -1,5 +1,4 @@
-// src/infrastructure/database/mongodb/CatalogServiceSchema.ts
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose from "mongoose";
 
 /**
  * Modelo de MongoDB (Capa de Lectura / CQRS Query)
@@ -7,23 +6,15 @@ import mongoose, { Schema, Document } from "mongoose";
  * y del Servicio mezclados.
  * PROPÓSITO: Que el frontend pueda renderizar el catálogo completo con un solo GET super rápido.
  */
-export interface ICatalogServiceMongo extends Document {
-  serviceId: string;
-  companyId: string;
-  companyName: string; // Dato duplicado intencionalmente para velocidad de lectura
-  serviceName: string;
-  inputSchema: any;
-}
-
-const CatalogServiceSchema: Schema = new Schema({
+const CatalogServiceSchema = new mongoose.Schema({
   serviceId: { type: String, required: true, unique: true },
   companyId: { type: String, required: true },
-  companyName: { type: String, required: true },
+  companyName: { type: String, required: true }, // Dato duplicado intencionalmente para velocidad de lectura
   serviceName: { type: String, required: true },
   inputSchema: { type: Object, required: true },
 });
 
-export const CatalogServiceModel = mongoose.model<ICatalogServiceMongo>(
+export const CatalogServiceModel = mongoose.model(
   "CatalogService",
   CatalogServiceSchema,
 );

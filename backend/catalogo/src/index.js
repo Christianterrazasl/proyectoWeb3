@@ -1,10 +1,8 @@
-// src/index.ts
-import "reflect-metadata"; // Requisito estricto del compilador de TypeScript para TypeORM
 import express from "express";
 import cors from "cors";
-import * as dotenv from "dotenv";
-import { initializeDatabases } from "./infrastructure/database/connection";
-import catalogRoutes from "./api/routes/catalog.routes";
+import dotenv from "dotenv";
+import { initializeDatabases } from "./infrastructure/database/connection.js";
+import catalogRoutes from "./api/routes/catalog.routes.js";
 
 dotenv.config();
 
