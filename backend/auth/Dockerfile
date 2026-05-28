@@ -1,12 +1,18 @@
-FROM node:18
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=3000
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+RUN sed -i 's/\r$//' /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 3000
 
-CMD ["node", "index.js"]
+CMD ["/app/entrypoint.sh"]

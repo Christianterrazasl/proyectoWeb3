@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.venv/
 
 # Build / output
 dist/
@@ -38,6 +39,14 @@ Thumbs.db
 # Test / coverage
 coverage/
 .nyc_output/
+.pytest_cache/
+
+# Python / Django
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+db.sqlite3
 
 # Misc
 *.local
