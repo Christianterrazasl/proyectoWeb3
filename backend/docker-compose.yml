@@ -9,8 +9,37 @@ services:
       - deudas
       - pagos
       - reportes
+  auth-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: multipagos_auth
+      POSTGRES_USER: multipagos
+      POSTGRES_PASSWORD: multipagos
+    ports:
+      - "5433:5432"
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U multipagos -d multipagos_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
   auth:
     build: ./auth
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      SECRET_KEY: multipagos-auth-ddd-dev-secret-key
+      DEBUG: "true"
+      ALLOWED_HOSTS: localhost,127.0.0.1,auth
+      DB_ENGINE: postgres
+      DB_NAME: multipagos_auth
+      DB_USER: multipagos
+      DB_PASSWORD: multipagos
+      DB_HOST: auth-db
+      DB_PORT: "5432"
     ports:
       - "3001:3000"
   catalogo:
@@ -21,6 +50,12 @@ services:
     build: ./deudas
     ports:
       - "3003:3000"
+    depends_on:
+      deudas_db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@deudas_db:5432/deudasdb
+    restart: unless-stopped
   pagos:
     build: ./pagos
     ports:
@@ -29,3 +64,24 @@ services:
     build: ./reportes
     ports:
       - "3005:3000"
+  deudas_db:
+    image: postgres:16-alpine
+    container_name: deudas_db
+    restart: always
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=deudasdb
+    volumes:
+      - deudas_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d deudasdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  auth_postgres_data:
+  deudas_postgres_data:

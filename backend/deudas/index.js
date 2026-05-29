@@ -1,11 +1,23 @@
-const express = require('express');
-const app = express();
-const PORT = 3000;
+const express = require('express')
+const { PrismaClient } = require('@prisma/client')
+const PORT = 3000
 
-app.get('/', (req, res) => {
-    res.send('Hello World from Deudas');
-});
+if (!process.env.DATABASE_URL) {
+    require('dotenv').config();
+}
+
+const prisma = new PrismaClient()
+
+const app = express()
+
+app.use(express.json())
+
+app.get('/debts', async (req, res) => {
+  const debts = await prisma.debt.findMany()
+
+  res.json(debts)
+})
 
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT} from Deudas`);
-});
+  console.log('Deudas service running')
+})

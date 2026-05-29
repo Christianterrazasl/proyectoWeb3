@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Debt {
+  id           Int      @id @default(autoincrement())
+  tenant_id    String
+  service_id   String
+  customer_ref String
+  period       String
+  amount       Float
+  due_date     DateTime
+  status       DebtStatus @default(PENDING)
+
+  created_at   DateTime @default(now())
+}
+
+model Import {
+  id            Int      @id @default(autoincrement())
+  filename      String
+  total_records Int
+  status        ImportStatus
+
+  created_at    DateTime @default(now())
+}
+
+enum DebtStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum ImportStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
