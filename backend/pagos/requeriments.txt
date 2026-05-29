@@ -1,0 +1,9 @@
+django
+djangorestframework
+psycopg2-binary
+pymongo
+pika
+qrcode
+Pillow
+pydantic
+python-dotenv

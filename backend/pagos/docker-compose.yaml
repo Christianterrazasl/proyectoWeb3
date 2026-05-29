@@ -1,0 +1,17 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: multipagos-rabbitmq
+    network_mode: "host" # Lo ponemos en la red host para que Django lo encuentre en localhost
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  payments_api:
+    build: .
+    container_name: multipagos-django-api
+    network_mode: "host" # Permite a Django leer tu localhost para Postgres y Mongo nativos
+    depends_on:
+      - rabbitmq
+    env_file:
+      - .env # Le pasamos tus variables de entorno automáticamente
