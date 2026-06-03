@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const deudasMock = [
   {
@@ -38,7 +39,10 @@ const ProveedorPage = () => {
   const [tab, setTab] = useState("pendientes");
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState("");
+
   const navigate = useNavigate();
+  const { logout, user } = useAuth();
+
   const handleCargarDeuda = (e) => {
     e.preventDefault();
     if (!documento.trim() || !concepto.trim() || !monto || !fecha) {
@@ -69,18 +73,30 @@ const ProveedorPage = () => {
   };
 
   const deudasFiltradas = deudas.filter((d) =>
-    tab === "pendientes" ? d.estado === "pendiente" : d.estado === "pagada"
+    tab === "pendientes" ? d.estado === "pendiente" : d.estado === "pagada",
   );
 
   const handleCerrarSesion = () => {
+    logout();
     navigate("/login");
   };
 
   return (
     <div className="w-full min-h-screen bg-primary text-white flex flex-col">
       <section className="py-4 px-8 bg-neutral text-black flex items-center justify-between">
-        <h1 className="text-[20px] font-semibold">MultiPagos — Proveedor</h1>
-        <button className="bg-primary text-white px-4 py-2 rounded-xl cursor-pointer" onClick={handleCerrarSesion}>Cerrar sesión</button>
+        <div>
+          <h1 className="text-[20px] font-semibold">MultiPagos — Proveedor</h1>
+          <p className="text-sm text-gray-700">
+            Sesión activa: {user?.email || "Usuario autenticado"}
+          </p>
+        </div>
+
+        <button
+          className="bg-primary text-white px-4 py-2 rounded-xl cursor-pointer"
+          onClick={handleCerrarSesion}
+        >
+          Cerrar sesión
+        </button>
       </section>
       <section className="w-full flex items-center justify-center py-8 px-8 flex-1">
         <div className="max-w-[1400px] mx-auto w-full gap-8 flex flex-col lg:flex-row">
@@ -91,7 +107,10 @@ const ProveedorPage = () => {
                 <AiOutlineLoading3Quarters className="text-5xl text-gray-900 animate-spin" />
               </div>
             ) : (
-              <form onSubmit={handleCargarDeuda} className="flex flex-col gap-4">
+              <form
+                onSubmit={handleCargarDeuda}
+                className="flex flex-col gap-4"
+              >
                 <div>
                   <label className="text-md font-semibold text-gray-500 mb-2 block">
                     Número de documento
@@ -203,7 +222,8 @@ const ProveedorPage = () => {
                 ))
               ) : (
                 <p className="text-[16px] text-gray-500 text-center py-12">
-                  No hay deudas {tab === "pendientes" ? "pendientes" : "pagadas"}
+                  No hay deudas{" "}
+                  {tab === "pendientes" ? "pendientes" : "pagadas"}
                 </p>
               )}
             </div>

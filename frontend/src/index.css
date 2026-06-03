@@ -1,16 +1,205 @@
 @import "tailwindcss";
 
-/* Inter ya está cargada desde Google Fonts en index.html; hay que usarla en CSS/Tailwind. */
+/*
+  Inter ya está cargada desde Google Fonts en index.html.
+  Mantenemos la paleta legacy para no romper las pantallas actuales
+  y agregamos el sistema Lumina Direct como tokens y clases globales reutilizables.
+*/
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Paleta legacy actual del proyecto */
   --color-primary: #0F172A;
   --color-secondary: #334155;
   --color-tertiary: #0284C7;
   --color-neutral: #F8FAFC;
+
+  /* Sistema Lumina Direct */
+  --color-lumina-surface: #101415;
+  --color-lumina-surface-bright: #363a3b;
+  --color-lumina-primary: #22d3ee;
+  --color-lumina-tertiary: #6366f1;
+  --color-lumina-on-surface: #e2e8f0;
+  --color-lumina-outline: #475569;
+  --color-lumina-success: #10b981;
+  --color-lumina-error: #ef4444;
 }
 
 @layer base {
   html {
     font-family: var(--font-sans);
+  }
+
+  body {
+    min-height: 100vh;
+    background-color: var(--color-lumina-surface);
+    color: var(--color-lumina-on-surface);
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background-color: rgba(34, 211, 238, 0.35);
+    color: var(--color-lumina-on-surface);
+  }
+}
+
+@layer components {
+  .lumina-page {
+    min-height: 100vh;
+    background-color: var(--color-lumina-surface);
+    color: var(--color-lumina-on-surface);
+  }
+
+  .lumina-card {
+    border: 1px solid rgba(71, 85, 105, 0.7);
+    border-radius: 8px;
+    background-color: rgba(54, 58, 59, 0.9);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+  }
+
+  .lumina-glass {
+    border: 1px solid rgba(71, 85, 105, 0.45);
+    background-color: rgba(16, 20, 21, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .lumina-input {
+    width: 100%;
+    border: 1px solid var(--color-lumina-outline);
+    border-radius: 8px;
+    background-color: rgba(16, 20, 21, 0.72);
+    color: var(--color-lumina-on-surface);
+    padding: 12px 14px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  }
+
+  .lumina-input::placeholder {
+    color: rgba(226, 232, 240, 0.58);
+  }
+
+  .lumina-input:focus {
+    outline: none;
+    border-color: var(--color-lumina-primary);
+    box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.14);
+    background-color: rgba(16, 20, 21, 0.88);
+  }
+
+  .lumina-button-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: none;
+    border-radius: 8px;
+    background-color: var(--color-lumina-primary);
+    color: #061014;
+    padding: 12px 24px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    box-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  }
+
+  .lumina-button-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 24px rgba(34, 211, 238, 0.38);
+  }
+
+  .lumina-button-primary:active {
+    transform: scale(0.95);
+  }
+
+  .lumina-button-primary:disabled {
+    cursor: not-allowed;
+    opacity: 0.68;
+    transform: none;
+    box-shadow: 0 0 12px rgba(34, 211, 238, 0.18);
+  }
+
+  .lumina-button-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid rgba(99, 102, 241, 0.45);
+    border-radius: 8px;
+    background-color: rgba(99, 102, 241, 0.14);
+    color: var(--color-lumina-on-surface);
+    padding: 12px 24px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  }
+
+  .lumina-button-secondary:hover {
+    transform: translateY(-1px);
+    border-color: rgba(99, 102, 241, 0.7);
+    background-color: rgba(99, 102, 241, 0.2);
+  }
+
+  .lumina-button-secondary:active {
+    transform: scale(0.95);
+  }
+
+  .lumina-trust-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(71, 85, 105, 0.55);
+    border-radius: 999px;
+    background-color: rgba(16, 20, 21, 0.72);
+    color: rgba(226, 232, 240, 0.78);
+    padding: 0.45rem 0.8rem;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+}
+
+@layer utilities {
+  .lumina-headline {
+    font-size: clamp(24px, 3.5vw, 32px);
+    line-height: 1.2;
+    font-weight: 700;
+  }
+
+  .lumina-title {
+    font-size: clamp(18px, 2vw, 20px);
+    line-height: 1.4;
+    font-weight: 600;
+  }
+
+  .lumina-body {
+    font-size: 16px;
+    line-height: 1.5;
+    font-weight: 400;
+  }
+
+  .lumina-label {
+    font-size: 12px;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .lumina-outline {
+    border-color: var(--color-lumina-outline);
+  }
+
+  .lumina-cyan-glow {
+    box-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
+  }
+
+  .lumina-success {
+    color: var(--color-lumina-success);
+  }
+
+  .lumina-error {
+    color: var(--color-lumina-error);
   }
 }

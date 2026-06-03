@@ -3,6 +3,7 @@ import Home from "./pages/Home.jsx";
 import DeudasPage from "./pages/DeudasPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import ProveedorPage from "./pages/ProveedorPage.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 export default function App() {
   return (
@@ -10,7 +11,11 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/deuda/:idProveedor" element={<DeudasPage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/proveedor" element={<ProveedorPage />} />
+      <Route path="/proveedor" element={
+        <ProtectedRoute>
+          <ProveedorPage />
+        </ProtectedRoute>
+      } />
     </Routes>
   );
 }
