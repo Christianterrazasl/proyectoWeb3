@@ -1,12 +1,20 @@
-FROM node:18
+# Usamos una imagen de Node.js ligera
+FROM node:20-alpine
 
-WORKDIR /app
+# Directorio de trabajo dentro del contenedor
+WORKDIR /usr/src/app
 
+# Copiamos solo los archivos de dependencias primero (optimiza la caché de Docker)
 COPY package*.json ./
+
+# Instalamos las dependencias
 RUN npm install
 
+# Copiamos el resto del código fuente
 COPY . .
 
+# Exponemos el puerto que usa nuestra API
 EXPOSE 3000
 
-CMD ["node", "index.js"]
+# Comando por defecto para iniciar la app (modo desarrollo)
+CMD ["npm", "run", "dev"]

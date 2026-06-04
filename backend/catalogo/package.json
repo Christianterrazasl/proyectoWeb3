@@ -6,21 +6,21 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon src/index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mongoose": "^9.6.0",
     "pg": "^8.20.0",
+    "reflect-metadata": "^0.2.2",
     "typeorm": "^0.3.28"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.14"
   }
 }
