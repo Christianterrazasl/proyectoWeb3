@@ -8,7 +8,8 @@ RUN npm install
 COPY . .
 
 RUN npx prisma generate
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 EXPOSE 3000
 
-CMD ["node", "index.js"]
+CMD ["/app/entrypoint.sh"]

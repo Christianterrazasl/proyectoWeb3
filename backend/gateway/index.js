@@ -8,52 +8,39 @@ const PORT = 3000;
 
 app.use(cors());
 app.use(morgan("dev"));
-app.use(express.json());
 
-app.use(
-  "/auth",
+app.get("/", (_req, res) => {
+  res.json({
+    service: "multipagos-gateway",
+    routes: [
+      "/api/auth",
+      "/api/admin",
+      "/api/catalog",
+      "/api/payments",
+      "/debts",
+      "/reportes",
+    ],
+  });
+});
+
+const proxy = (target, pathRewrite) =>
   createProxyMiddleware({
-    target: "http://auth:3000",
+    target,
     changeOrigin: true,
-    pathRewrite: { "^/auth": "" },
+    ...(pathRewrite ? { pathRewrite } : {}),
+  });
+
+app.use("/api/auth", proxy("http://auth:3000"));
+app.use("/api/admin", proxy("http://catalogo:3000"));
+app.use("/api/catalog", proxy("http://catalogo:3000"));
+app.use("/api/payments", proxy("http://pagos:3000"));
+app.use(
+  "/debts",
+  proxy("http://deudas:3000", {
+    "^/": "/debts/",
   })
 );
-
-app.use(
-  "/catalogo",
-  createProxyMiddleware({
-    target: "http://catalogo:3000",
-    changeOrigin: true,
-    pathRewrite: { "^/catalogo": "" },
-  })
-);
-
-app.use(
-  "/deudas",
-  createProxyMiddleware({
-    target: "http://deudas:3000",
-    changeOrigin: true,
-    pathRewrite: { "^/deudas": "" },
-  })
-);
-
-app.use(
-  "/pagos",
-  createProxyMiddleware({
-    target: "http://pagos:3000",
-    changeOrigin: true,
-    pathRewrite: { "^/pagos": "" },
-  })
-);
-
-app.use(
-  "/reportes",
-  createProxyMiddleware({
-    target: "http://reportes:3000",
-    changeOrigin: true,
-    pathRewrite: { "^/reportes": "" },
-  })
-);
+app.use("/reportes", proxy("http://reportes:3000"));
 
 app.listen(PORT, () => {
   console.log(`API Gateway corriendo en http://localhost:${PORT}`);

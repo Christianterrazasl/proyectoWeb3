@@ -4,11 +4,33 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - auth
-      - catalogo
-      - deudas
-      - pagos
-      - reportes
+      auth:
+        condition: service_started
+      catalogo:
+        condition: service_started
+      pagos:
+        condition: service_started
+      deudas:
+        condition: service_started
+      reportes:
+        condition: service_started
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   auth-db:
     image: postgres:16-alpine
     environment:
@@ -24,6 +46,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+
   auth:
     build: ./auth
     depends_on:
@@ -33,47 +57,71 @@ services:
     environment:
       SECRET_KEY: multipagos-auth-ddd-dev-secret-key
       DEBUG: "true"
-      ALLOWED_HOSTS: localhost,127.0.0.1,auth
+      ALLOWED_HOSTS: localhost,127.0.0.1,auth,gateway
       DB_ENGINE: postgres
       DB_NAME: multipagos_auth
       DB_USER: multipagos
       DB_PASSWORD: multipagos
       DB_HOST: auth-db
       DB_PORT: "5432"
+      PORT: "3000"
     ports:
       - "3001:3000"
+
+  catalogo-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: multipagos_catalogo
+      POSTGRES_USER: multipagos
+      POSTGRES_PASSWORD: multipagos
+    ports:
+      - "5435:5432"
+    volumes:
+      - catalogo_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U multipagos -d multipagos_catalogo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  catalogo-mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - catalogo_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   catalogo:
     build: ./catalogo
-    ports:
-      - "3002:3000"
-  deudas:
-    build: ./deudas
-    ports:
-      - "3003:3000"
     depends_on:
-      deudas_db:
+      catalogo-db:
+        condition: service_healthy
+      catalogo-mongo:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@deudas_db:5432/deudasdb
+      PORT: "3000"
+      POSTGRES_URI: postgresql://multipagos:multipagos@catalogo-db:5432/multipagos_catalogo
+      MONGO_URI: mongodb://catalogo-mongo:27017/multipagos_catalogo
+    ports:
+      - "3002:3000"
     restart: unless-stopped
-  pagos:
-    build: ./pagos
-    ports:
-      - "3004:3000"
-  reportes:
-    build: ./reportes
-    ports:
-      - "3005:3000"
+
   deudas_db:
     image: postgres:16-alpine
     container_name: deudas_db
-    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: deudasdb
     ports:
       - "5434:5432"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=deudasdb
     volumes:
       - deudas_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -81,7 +129,85 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+
+  deudas:
+    build: ./deudas
+    depends_on:
+      deudas_db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@deudas_db:5432/deudasdb
+      PORT: "3000"
+    ports:
+      - "3003:3000"
+    restart: unless-stopped
+
+  pagos-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: multipagos_pagos
+      POSTGRES_USER: multipagos
+      POSTGRES_PASSWORD: multipagos
+    ports:
+      - "5436:5432"
+    volumes:
+      - pagos_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U multipagos -d multipagos_pagos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  pagos-mongo:
+    image: mongo:7
+    ports:
+      - "27018:27017"
+    volumes:
+      - pagos_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  pagos:
+    build: ./pagos
+    depends_on:
+      pagos-db:
+        condition: service_healthy
+      pagos-mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SECRET_KEY: multipagos-pagos-dev-secret-key
+      DEBUG: "true"
+      ALLOWED_HOSTS: localhost,127.0.0.1,pagos,gateway
+      POSTGRES_DB: multipagos_pagos
+      POSTGRES_USER: multipagos
+      POSTGRES_PASSWORD: multipagos
+      POSTGRES_HOST: pagos-db
+      POSTGRES_PORT: "5432"
+      MONGO_URI: mongodb://pagos-mongo:27017/pagos_db
+      RABBITMQ_HOST: rabbitmq
+      PORT: "3000"
+    ports:
+      - "3004:3000"
+    restart: unless-stopped
+
+  reportes:
+    build: ./reportes
+    ports:
+      - "3005:3000"
+    restart: unless-stopped
 
 volumes:
   auth_postgres_data:
+  catalogo_postgres_data:
+  catalogo_mongo_data:
   deudas_postgres_data:
+  pagos_postgres_data:
+  pagos_mongo_data:

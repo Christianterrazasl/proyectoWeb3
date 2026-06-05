@@ -13,6 +13,10 @@ export default defineConfig(({ mode }) => {
           target: env.VITE_AUTH_PROXY_TARGET || "http://127.0.0.1:3000",
           changeOrigin: true,
         },
+        "/debts": {
+          target: env.VITE_AUTH_PROXY_TARGET || "http://127.0.0.1:3000",
+          changeOrigin: true,
+        },
       },
     },
   };

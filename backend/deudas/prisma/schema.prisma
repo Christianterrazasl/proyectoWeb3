@@ -7,8 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Provider {
+  id          Int      @id @default(autoincrement())
+  tenant_id   String   @unique
+  name        String
+  description String   @default("Pago de servicios")
+  image_url   String
+  active      Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+
+  @@map("providers")
+}
+
 model Debt {
-  id           Int      @id @default(autoincrement())
+  id           Int        @id @default(autoincrement())
   tenant_id    String
   service_id   String
   customer_ref String
@@ -17,16 +30,16 @@ model Debt {
   due_date     DateTime
   status       DebtStatus @default(PENDING)
 
-  created_at   DateTime @default(now())
+  created_at DateTime @default(now())
 }
 
 model Import {
-  id            Int      @id @default(autoincrement())
+  id            Int          @id @default(autoincrement())
   filename      String
   total_records Int
   status        ImportStatus
 
-  created_at    DateTime @default(now())
+  created_at DateTime @default(now())
 }
 
 enum DebtStatus {

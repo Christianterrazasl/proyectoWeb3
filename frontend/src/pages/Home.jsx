@@ -3,60 +3,33 @@ import { FaSearch } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-
-const deudas = [
-  {
-    id: "1",
-    name: "Nur",
-    description: "Pago de servicios",
-    image: "https://placehold.net/1.png",
-    idProveedor: "1",
-  },
-  {
-    id: "2",
-    name: "Saguapac",
-    description: "Pago de servicios",
-    image: "https://placehold.net/2.png",
-    idProveedor: "2",
-  },
-  {
-    id: "3",
-    name: "Cre",
-    description: "Pago de servicios",
-    image: "https://placehold.net/3.png",
-    idProveedor: "3",
-  },
-  {
-    id: "4",
-    name: "Colegio Marista",
-    description: "Pago de servicios",
-    image: "https://placehold.net/4.png",
-    idProveedor: "4",
-  },
-  {
-    id: "6",
-    name: "Tigo",
-    description: "Pago de servicios",
-    image: "https://placehold.net/6.png",
-    idProveedor: "6",
-  },
-];
+import { searchProvidersByDocument } from "../services/deudasApi";
 
 const HomePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (searchQuery.length < 1) {
       return;
     }
 
     setLoading(true);
-    setTimeout(() => {
-      setSearchResults(deudas);
+    setError("");
+    setHasSearched(true);
+
+    try {
+      const results = await searchProvidersByDocument(searchQuery.trim());
+      setSearchResults(results);
+    } catch (err) {
+      setSearchResults([]);
+      setError(err.message || "No se pudo completar la búsqueda");
+    } finally {
       setLoading(false);
-    }, 2000);
+    }
   };
 
   const navigate = useNavigate();
@@ -80,6 +53,7 @@ const HomePage = () => {
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               type="text"
               placeholder="Ingrese su numero de documento"
               className="w-full p-2 border-[1px] border-gray-400 text-black"
@@ -96,7 +70,11 @@ const HomePage = () => {
       <section className="bg-neutral py-16">
         {!loading ? (
           <div className="flex items-center justify-center w-full">
-            {searchResults.length > 0 ? (
+            {error ? (
+              <div className="flex items-center justify-center h-[400px] w-full text-center">
+                <p className="text-[20px] text-red-600">{error}</p>
+              </div>
+            ) : searchResults.length > 0 ? (
               <div className="max-w-[1300px] mx-auto grid grid-cols-4 gap-4">
                 {searchResults.map((deuda) => (
                   <div
@@ -120,10 +98,16 @@ const HomePage = () => {
                   </div>
                 ))}
               </div>
-            ) : (
+            ) : hasSearched ? (
               <div className="flex items-center justify-center h-[400px] w-full text-center">
                 <p className="text-[20px] text-gray-500">
                   No se encontraron deudas para el numero de documento ingresado
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[400px] w-full text-center">
+                <p className="text-[20px] text-gray-500">
+                  Ingresa tu CI/NIT o código de cliente para ver tus deudas
                 </p>
               </div>
             )}
