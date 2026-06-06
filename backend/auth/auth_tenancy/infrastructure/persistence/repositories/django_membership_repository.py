@@ -29,6 +29,10 @@ class DjangoMembershipRepository(MembershipRepository):
         queryset = MembershipModel.objects.filter(user_id=user_id)
         return [MembershipMapper.to_domain(model) for model in queryset]
 
+    def list_active_by_user(self, user_id: int) -> list[Membership]:
+        queryset = MembershipModel.objects.filter(user_id=user_id, active=True)
+        return [MembershipMapper.to_domain(model) for model in queryset]
+
     def list_company_ids_for_user(self, user_id: int) -> list[int]:
         return list(
             MembershipModel.objects.filter(user_id=user_id, active=True)

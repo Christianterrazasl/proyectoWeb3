@@ -2,7 +2,7 @@ import { Service } from "../../domain/models/Service.js";
 
 /**
  * Caso de Uso: Registrar un nuevo servicio en el catálogo de Multipagos.
- * DTO esperado en el execute: { companyId, name, fields }
+ * DTO esperado en el execute: { companyId, name, fields, isPublished }
  */
 export class CreateServiceCommandHandler {
   constructor(serviceRepository) {
@@ -11,10 +11,19 @@ export class CreateServiceCommandHandler {
 
   async execute(dto) {
     // Validamos que el servicio contenga al menos un campo de identificación (ej. nro_cliente)
-    if (!dto.companyId || !dto.name || !dto.fields || dto.fields.length === 0) {
+    if (!Number.isInteger(dto.companyId) || !dto.name || !dto.fields || dto.fields.length === 0) {
       throw new Error(
         "Datos incompletos. Un servicio requiere al menos un campo en su esquema.",
       );
+    }
+
+    const duplicatedField = dto.fields.find(
+      (field, index) =>
+        dto.fields.findIndex((candidate) => candidate.name === field.name) !== index,
+    );
+
+    if (duplicatedField) {
+      throw new Error("Los campos del esquema deben tener nombres únicos.");
     }
 
     // TODO: Mover a generador de identificadores robusto (uuid)
@@ -26,7 +35,7 @@ export class CreateServiceCommandHandler {
       dto.companyId,
       dto.name,
       { fields: dto.fields },
-      true, // El servicio nace activo para ser listado en el catálogo
+      dto.isPublished ?? true,
     );
 
     // Persistimos el servicio. El repositorio actualizará Postgres y aplanará la vista en Mongo.

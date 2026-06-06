@@ -2,6 +2,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from auth_tenancy.application.commands import LoginUserCommand, RegisterUserCommand
 from auth_tenancy.application.queries import GetCurrentUserQuery
+from auth_tenancy.infrastructure.tenancy.tenant_resolver import TenantResolver
 from auth_tenancy.interfaces.api.dependencies import (
     get_current_user_handler,
     get_login_user_handler,
@@ -55,7 +56,12 @@ class MeView(BaseApiView):
         handler = get_current_user_handler()
 
         try:
-            result = handler.handle(GetCurrentUserQuery(user_id=request.user.id))
+            result = handler.handle(
+                GetCurrentUserQuery(
+                    user_id=request.user.id,
+                    active_company_id=TenantResolver.resolve_company_id(request),
+                )
+            )
             return self.success_response(result)
         except Exception as error:
             return self.handle_domain_exception(error)

@@ -1,5 +1,5 @@
 import time
-from datetime import datetime
+from django.utils import timezone
 from pydantic import BaseModel, Field
 from payments.domain.models import Transaction, TransactionStatus
 from payments.domain.repositories import ITransactionRepository
@@ -39,7 +39,7 @@ class CreateTransactionCommandHandler:
             customer_ref=dto.customer_ref,
             amount=dto.amount,
             status=TransactionStatus.PENDING,  # Nace siempre pendiente
-            created_at=datetime.now(),
+            created_at=timezone.now(),
             receipt_hash=None
         )
 

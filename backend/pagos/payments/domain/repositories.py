@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from datetime import datetime
+from typing import Optional, List, Dict, Any
 from .models import Transaction
 
 
@@ -20,4 +21,16 @@ class ITransactionRepository(ABC):
 
     @abstractmethod
     def find_by_tenant_and_service(self, tenant_id: str, service_id: str) -> List[Transaction]:
+        pass
+
+    @abstractmethod
+    def list_admin_transactions(
+        self,
+        tenant_id: Optional[str] = None,
+        service_id: Optional[str] = None,
+        status: Optional[str] = None,
+        customer_ref: Optional[str] = None,
+        created_from: Optional[datetime] = None,
+        created_to: Optional[datetime] = None,
+    ) -> List[Dict[str, Any]]:
         pass

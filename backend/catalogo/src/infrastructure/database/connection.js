@@ -21,9 +21,9 @@ export const connectMongoDB = async () => {
     const mongoUri =
       process.env.MONGO_URI || "mongodb://localhost:27017/multipagos_db";
     await mongoose.connect(mongoUri);
-    console.log("✅ Conectado a MongoDB (Lectura)");
+    console.log(" Conectado a MongoDB (Lectura)");
   } catch (error) {
-    console.error("❌ Error conectando a MongoDB:", error);
+    console.error("Error conectando a MongoDB:", error);
     process.exit(1);
   }
 };
@@ -32,10 +32,10 @@ export const connectMongoDB = async () => {
 export const initializeDatabases = async () => {
   try {
     await AppDataSource.initialize();
-    console.log("✅ Conectado a PostgreSQL (Escritura)");
+    console.log("Conectado a PostgreSQL (Escritura)");
     await connectMongoDB();
   } catch (error) {
-    console.error("❌ Error inicializando bases de datos:", error);
+    console.error("Error inicializando bases de datos:", error);
     process.exit(1);
   }
 };

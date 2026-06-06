@@ -8,10 +8,15 @@ import mongoose from "mongoose";
  */
 const CatalogServiceSchema = new mongoose.Schema({
   serviceId: { type: String, required: true, unique: true },
-  companyId: { type: String, required: true },
+  companyId: { type: Number, required: true },
   companyName: { type: String, required: true }, // Dato duplicado intencionalmente para velocidad de lectura
+  companyNit: { type: String, required: true },
+  companyStatus: { type: String, required: true },
+  companyActive: { type: Boolean, required: true },
+  companyLogoUrl: { type: String, required: false },
   serviceName: { type: String, required: true },
   inputSchema: { type: Object, required: true },
+  isPublished: { type: Boolean, required: true, default: true },
 });
 
 export const CatalogServiceModel = mongoose.model(

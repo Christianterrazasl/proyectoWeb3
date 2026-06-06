@@ -1,19 +1,52 @@
 from __future__ import annotations
 
-from auth_tenancy.application.dto import UserDTO
+from auth_tenancy.application.dto import AccessibleCompanyDTO, CurrentUserDTO, UserDTO, UserMembershipDTO
 from auth_tenancy.application.queries import GetCurrentUserQuery
-from auth_tenancy.domain.exceptions import NotFoundError
-from auth_tenancy.domain.repositories import UserRepository
+from auth_tenancy.domain.exceptions import AuthorizationError, NotFoundError
+from auth_tenancy.domain.repositories import CompanyRepository, MembershipRepository, UserRepository
 
 
 class GetCurrentUserHandler:
-    def __init__(self, user_repository: UserRepository):
+    def __init__(
+        self,
+        user_repository: UserRepository,
+        membership_repository: MembershipRepository,
+        company_repository: CompanyRepository,
+    ):
         self.user_repository = user_repository
+        self.membership_repository = membership_repository
+        self.company_repository = company_repository
 
-    def handle(self, query: GetCurrentUserQuery) -> UserDTO:
+    def handle(self, query: GetCurrentUserQuery) -> CurrentUserDTO:
         user = self.user_repository.get_by_id(query.user_id)
 
         if user is None:
             raise NotFoundError("User not found")
 
-        return UserDTO.from_entity(user)
+        memberships = self.membership_repository.list_active_by_user(query.user_id)
+        company_ids = [membership.company_id for membership in memberships]
+
+        if query.active_company_id is not None and query.active_company_id not in company_ids:
+            raise AuthorizationError("You do not have access to this tenant")
+
+        companies_by_id = {
+            company.id: company
+            for company in self.company_repository.list_by_ids(company_ids)
+            if company.id is not None
+        }
+
+        accessible_companies = [
+            AccessibleCompanyDTO.from_entity(
+                companies_by_id[membership.company_id],
+                membership_role=membership.company_role.value,
+            )
+            for membership in memberships
+            if membership.company_id in companies_by_id
+        ]
+
+        return CurrentUserDTO(
+            user=UserDTO.from_entity(user),
+            memberships=[UserMembershipDTO.from_entity(membership) for membership in memberships],
+            accessible_companies=accessible_companies,
+            active_company_id=query.active_company_id if query.active_company_id is not None else (company_ids[0] if company_ids else None),
+        )

@@ -6,11 +6,11 @@
  * Representa un servicio específico que una empresa ofrece (ej. "Pago de Luz").
  */
 export class Service {
-  constructor(id, companyId, name, inputSchema, isActive = true) {
+  constructor(id, companyId, name, inputSchema, isPublished = true) {
     this.id = id; // Formato esperado: srv-001
-    this.companyId = companyId; // Identificador de la empresa dueña de este servicio
+    this.companyId = companyId; // ID canónico de auth para la empresa dueña del servicio
     this.name = name;
     this.inputSchema = inputSchema; // Debe contener { fields: [] }
-    this.isActive = isActive;
+    this.isPublished = isPublished;
   }
 }

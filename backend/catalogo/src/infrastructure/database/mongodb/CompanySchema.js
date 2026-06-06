@@ -6,10 +6,11 @@ import mongoose from "mongoose";
  */
 const CompanySchema = new mongoose.Schema(
   {
-    companyId: { type: String, required: true, unique: true }, // Usamos nuestro propio ID de negocio (cmp-XXX), no el _id de Mongo
+    companyId: { type: Number, required: true, unique: true },
     name: { type: String, required: true },
     nit: { type: String, required: true, unique: true },
     status: { type: String, required: true },
+    active: { type: Boolean, required: true, default: true },
     logoUrl: { type: String, required: false },
   },
   {

@@ -1,6 +1,9 @@
 import base64
+from datetime import datetime, time
 from io import BytesIO
 import qrcode
+from django.utils import timezone
+from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -12,7 +15,68 @@ from ..infrastructure.repositories_impl import TransactionRepositoryImpl
 from ..application.commands import ConfirmPaymentDTO, ConfirmPaymentCommandHandler
 from ..infrastructure.rabbitmq_publisher import RabbitMQPublisher
 
-from ..application.queries import GetTransactionQueryHandler
+from ..application.queries import (
+    AdminTransactionFilters,
+    GetTransactionQueryHandler,
+    ListAdminTransactionsQueryHandler,
+)
+
+
+def _parse_filter_datetime(raw_value: str, field_name: str, end_of_day: bool = False) -> datetime:
+    """Normaliza filtros de fecha para que la API admin acepte ISO completo o solo YYYY-MM-DD."""
+    parsed_datetime = parse_datetime(raw_value)
+    if parsed_datetime:
+        return _ensure_aware_datetime(parsed_datetime)
+
+    parsed_date = parse_date(raw_value)
+    if parsed_date:
+        selected_time = time.max if end_of_day else time.min
+        return _ensure_aware_datetime(datetime.combine(parsed_date, selected_time))
+
+    raise ValueError(
+        f"El filtro '{field_name}' debe venir en formato ISO 8601 o YYYY-MM-DD."
+    )
+
+
+def _ensure_aware_datetime(value: datetime) -> datetime:
+    """Convierte fechas naive al timezone actual antes de consultar la proyección."""
+    if timezone.is_naive(value):
+        return timezone.make_aware(value, timezone.get_current_timezone())
+
+    return value
+
+
+def _normalize_status_filter(raw_status: str | None) -> str | None:
+    """Homologa el estado para que el repositorio compare contra el valor persistido."""
+    if raw_status is None:
+        return None
+
+    normalized_status = raw_status.strip().upper()
+    return normalized_status or None
+
+
+def _build_admin_transaction_filters(query_params) -> AdminTransactionFilters:
+    """Traduce query params HTTP al objeto de filtros que entiende el caso de uso admin."""
+    created_from = None
+    created_to = None
+
+    if query_params.get('from'):
+        created_from = _parse_filter_datetime(query_params.get('from'), 'from')
+
+    if query_params.get('to'):
+        created_to = _parse_filter_datetime(query_params.get('to'), 'to', end_of_day=True)
+
+    if created_from and created_to and created_from > created_to:
+        raise ValueError("El rango de fechas es inválido: 'from' no puede ser mayor que 'to'.")
+
+    return AdminTransactionFilters(
+        tenant_id=query_params.get('tenant_id') or None,
+        service_id=query_params.get('service_id') or None,
+        status=_normalize_status_filter(query_params.get('status')),
+        customer_ref=query_params.get('customer_ref') or None,
+        created_from=created_from,
+        created_to=created_to,
+    )
 
 class CreatePaymentView(APIView):
     """
@@ -133,4 +197,38 @@ class GetPaymentView(APIView):
             return Response({
                 "success": False,
                 "message": f"Error interno: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AdminTransactionListView(APIView):
+    """
+    Controlador para GET /api/payments/admin/transactions.
+    `pagos` conserva esta lectura porque es el dueño de las transacciones que luego consume `reportes`.
+    """
+
+    def get(self, request):
+        try:
+            # `reportes` puede reenviar `tenant_id` cuando auth resolvió un scope por empresa.
+            # Si no llega ese filtro, la vista admin permanece global dentro de `pagos`.
+            filters = _build_admin_transaction_filters(request.query_params)
+
+            repository = TransactionRepositoryImpl()
+            handler = ListAdminTransactionsQueryHandler(repository)
+            transactions = handler.execute(filters)
+
+            return Response({
+                "success": True,
+                "data": transactions
+            }, status=status.HTTP_200_OK)
+
+        except ValueError as e:
+            return Response({
+                "success": False,
+                "message": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception:
+            return Response({
+                "success": False,
+                "message": "Error interno del servidor"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -28,7 +28,7 @@ export class ServiceRepositoryImpl {
       companyId: service.companyId,
       name: service.name,
       inputSchema: service.inputSchema,
-      isActive: service.isActive,
+      isPublished: service.isPublished,
     });
     await this.pgServiceRepo.save(pgService);
 
@@ -40,15 +40,31 @@ export class ServiceRepositoryImpl {
         serviceId: service.id,
         companyId: company.id,
         companyName: company.name, // Dato cruzado
+        companyNit: company.nit,
+        companyStatus: company.status,
+        companyActive: company.active,
+        companyLogoUrl: company.logoUrl,
         serviceName: service.name,
         inputSchema: service.inputSchema,
+        isPublished: service.isPublished,
       },
       { upsert: true },
     );
   }
 
   async findByCompanyId(companyId) {
-    // Pendiente de implementar si requerimos filtrar desde Postgres internamente
-    return [];
+    return this.readProjection({ companyId });
+  }
+
+  async findAll() {
+    return this.readProjection();
+  }
+
+  async readProjection(filter = {}) {
+    // La vista admin lee desde Mongo porque ya tiene servicio + empresa desnormalizados.
+    // `reportes` depende de esta proyección para no repetir joins ni ownership del catálogo.
+    return CatalogServiceModel.find(filter, "-_id -__v")
+      .sort({ companyName: 1, serviceName: 1 })
+      .lean();
   }
 }

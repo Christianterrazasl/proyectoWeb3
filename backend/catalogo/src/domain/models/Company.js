@@ -6,11 +6,12 @@
  * Es una clase pura de JavaScript, totalmente agnóstica a la base de datos (Postgres/Mongo) o Express.
  */
 export class Company {
-  constructor(id, name, nit, status, createdAt, updatedAt, logoUrl) {
-    this.id = id; // Formato esperado: cmp-001
+  constructor(id, name, nit, status, active, createdAt, updatedAt, logoUrl) {
+    this.id = id; // ID canónico emitido por auth
     this.name = name;
     this.nit = nit;
-    this.status = status; // "PENDING" | "ACTIVE" | "INACTIVE"
+    this.status = status; // "PENDING" | "APPROVED" | "REJECTED"
+    this.active = active;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
     this.logoUrl = logoUrl;
@@ -22,12 +23,13 @@ export class Company {
    * usamos métodos de dominio para encapsular la lógica.
    */
   isActive() {
-    return this.status === "ACTIVE";
+    return this.status === "APPROVED" && this.active === true;
   }
 
-  activate() {
-    // Al activar, siempre actualizamos la fecha de modificación
-    this.status = "ACTIVE";
+  syncLifecycle(status, active) {
+    // Catálogo no decide el lifecycle: solo refleja el contrato canónico resuelto en auth.
+    this.status = status;
+    this.active = active;
     this.updatedAt = new Date();
   }
 }

@@ -9,11 +9,11 @@ export const ServiceEntity = new EntitySchema({
   tableName: "services",
   columns: {
     id: { type: "varchar", length: 50, primary: true },
-    companyId: { type: "varchar", length: 50 },
+    companyId: { type: "int" },
     name: { type: "varchar", length: 150 },
     // Guardamos el JSON dinámico directamente en PostgreSQL usando jsonb
     inputSchema: { type: "jsonb" },
-    isActive: { type: "boolean", default: true },
+    isPublished: { type: "boolean", default: true },
   },
   relations: {
     /**

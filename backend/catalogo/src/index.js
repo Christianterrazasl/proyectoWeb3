@@ -37,7 +37,7 @@ const startServer = async () => {
         `🚀 Servidor de Catálogo corriendo en http://localhost:${PORT}`,
       );
       console.log(
-        `👉 Prueba POST http://localhost:${PORT}/api/admin/companies`,
+        `👉 Prueba POST http://localhost:${PORT}/api/admin/services`,
       );
       console.log(
         `👉 Prueba GET  http://localhost:${PORT}/api/catalog/services`,

@@ -106,6 +106,7 @@ services:
       catalogo-mongo:
         condition: service_healthy
     environment:
+      AUTH_ME_URL: http://auth:3000/api/auth/me/
       PORT: "3000"
       POSTGRES_URI: postgresql://multipagos:multipagos@catalogo-db:5432/multipagos_catalogo
       MONGO_URI: mongodb://catalogo-mongo:27017/multipagos_catalogo

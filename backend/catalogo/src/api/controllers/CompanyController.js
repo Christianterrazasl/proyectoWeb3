@@ -1,72 +1,115 @@
-import { CatalogServiceModel } from "../../infrastructure/database/mongodb/CatalogServiceSchema.js";
+import { Company } from "../../domain/models/Company.js";
 
-/**
- * Controlador para el dominio de Empresas y Servicios.
- * Actúa como la capa de presentación (API). Su única responsabilidad es
- * orquestar los handlers (Commands) y manejar las respuestas HTTP, sin incluir lógica de negocio.
- */
 export class CompanyController {
-  // Inyección de dependencias mediante el constructor para facilitar el testing.
-  constructor(createCompanyHandler, companyRepository, createServiceHandler) {
-    this.createCompanyHandler = createCompanyHandler;
+  constructor(companyRepository, serviceRepository, createServiceHandler) {
     this.companyRepository = companyRepository;
+    this.serviceRepository = serviceRepository;
     this.createServiceHandler = createServiceHandler;
   }
 
   /**
-   * POST /api/admin/companies
-   * Registra una nueva empresa proveedora en el sistema (Operación de Escritura).
+   * POST /api/admin/services
+   * Crea un servicio dentro de la empresa que auth ya validó.
    */
-  async createCompany(req, res) {
+  async createService(req, res) {
     try {
-      // Delegamos la ejecución estructural y de negocio al caso de uso correspondiente
-      const newCompany = await this.createCompanyHandler.execute({
+      if (req.companyId === null || req.companyId === undefined) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Debes enviar X-Company-Id o seleccionar una empresa activa en la sesión.",
+        });
+      }
+
+      const scopedCompany = req.authContext?.accessible_companies?.find(
+        (company) => company.id === req.companyId,
+      );
+
+      if (!scopedCompany) {
+        return res.status(403).json({
+          success: false,
+          message: "La empresa solicitada no pertenece al contexto autenticado.",
+        });
+      }
+
+      // Guardamos una referencia canónica de la empresa validada por auth.
+      await this.companyRepository.save(
+        new Company(
+          scopedCompany.id,
+          scopedCompany.name,
+          scopedCompany.nit,
+          scopedCompany.status,
+          scopedCompany.active,
+          new Date(),
+          new Date(),
+          scopedCompany.logo_url ?? null,
+        ),
+      );
+
+      const newService = await this.createServiceHandler.execute({
+        companyId: req.companyId,
         name: req.body.name,
-        nit: req.body.nit,
-        logoUrl: req.body.logoUrl,
+        fields: req.body.inputSchema?.fields ?? req.body.fields,
+        isPublished: req.body.isPublished,
       });
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
-        message: "Empresa dada de alta en el sistema multi-tenant.",
-        data: newCompany,
+        data: newService,
       });
     } catch (error) {
-      // Capturamos errores de dominio (ej. NIT duplicado o validaciones fallidas)
-      res.status(400).json({ success: false, message: error.message });
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
     }
   }
 
   /**
-   * POST /api/catalog/services
-   * Registra un nuevo servicio asociado a una empresa existente.
+   * GET /api/admin/services
+   * Lo consumen el panel admin y reportes para reutilizar una sola vista operativa.
+   * Catálogo expone esta lectura porque sigue siendo dueño de los metadatos del servicio.
    */
-  async createService(req, res) {
+  async getAdminServices(req, res) {
     try {
-      const newService = await this.createServiceHandler.execute({
-        companyId: req.body.companyId,
-        name: req.body.name,
-        fields: req.body.fields,
-      });
+      // Solo filtramos si el cliente pidió scope explícito con el header.
+      // Sin `X-Company-Id`, el admin conserva visión global sobre todos los servicios.
+      const requestedCompanyId = req.header("x-company-id") ? req.companyId : null;
 
-      res.status(201).json({ success: true, data: newService });
+      const services = requestedCompanyId
+        ? await this.serviceRepository.findByCompanyId(requestedCompanyId)
+        : await this.serviceRepository.findAll();
+
+      return res.status(200).json({
+        success: true,
+        data: services,
+      });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      return res.status(500).json({
+        success: false,
+        message: "No se pudo obtener la lista administrativa de servicios.",
+      });
     }
   }
 
   /**
    * GET /api/catalog/services
-   * Obtiene el catálogo completo (Operación de Lectura).
-   * Nota para el equipo: Para maximizar el rendimiento (CQRS), esta consulta va
-   * directo a la vista proyectada en MongoDB, saltándose PostgreSQL.
+   * Lectura pública del catálogo.
    */
   async getCatalog(req, res) {
     try {
+      const { CatalogServiceModel } = await import(
+        "../../infrastructure/database/mongodb/CatalogServiceSchema.js"
+      );
+
       const catalog = await CatalogServiceModel.find({}, "-_id -__v").lean();
-      res.status(200).json({ success: true, data: catalog });
+
+      return res.status(200).json({
+        success: true,
+        data: catalog,
+      });
     } catch (error) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: "Error interno al obtener el catálogo.",
       });

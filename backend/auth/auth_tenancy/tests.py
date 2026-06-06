@@ -41,7 +41,80 @@ class AuthTenancyApiTests(APITestCase):
         me_response = self.client.get("/api/auth/me/")
 
         self.assertEqual(me_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(me_response.data["email"], "jesus@test.com")
+        self.assertEqual(me_response.data["user"]["email"], "jesus@test.com")
+        self.assertEqual(me_response.data["memberships"], [])
+        self.assertEqual(me_response.data["accessible_companies"], [])
+        self.assertIsNone(me_response.data["active_company_id"])
+
+    def test_me_returns_bootstrap_context_for_multi_company_memberships(self):
+        user = self.user_model.objects.create_user(
+            email="multi@test.com",
+            username="multi",
+            password="123456",
+            global_role="provider",
+        )
+        company_a = CompanyModel.objects.create(
+            name="Aguas del Sur",
+            nit="3001",
+            status="APPROVED",
+            logo_url="https://example.com/a.png",
+        )
+        company_b = CompanyModel.objects.create(
+            name="Electro Norte",
+            nit="3002",
+            status="PENDING",
+            active=False,
+            logo_url="https://example.com/b.png",
+        )
+
+        MembershipModel.objects.create(user=user, company=company_a, company_role="manager")
+        MembershipModel.objects.create(user=user, company=company_b, company_role="operator")
+
+        self.client.force_authenticate(user=user)
+        me_response = self.client.get("/api/auth/me/")
+
+        self.assertEqual(me_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(me_response.data["user"]["email"], "multi@test.com")
+        self.assertEqual(me_response.data["active_company_id"], company_a.id)
+
+        memberships_by_company = {
+            item["company_id"]: item
+            for item in me_response.data["memberships"]
+        }
+        self.assertEqual(memberships_by_company[company_a.id]["company_role"], "manager")
+        self.assertEqual(memberships_by_company[company_b.id]["company_role"], "operator")
+
+        companies_by_id = {
+            item["id"]: item
+            for item in me_response.data["accessible_companies"]
+        }
+        self.assertEqual(companies_by_id[company_a.id]["membership_role"], "manager")
+        self.assertEqual(companies_by_id[company_a.id]["status"], "APPROVED")
+        self.assertTrue(companies_by_id[company_a.id]["active"])
+        self.assertEqual(companies_by_id[company_b.id]["membership_role"], "operator")
+        self.assertEqual(companies_by_id[company_b.id]["status"], "PENDING")
+        self.assertFalse(companies_by_id[company_b.id]["active"])
+
+    def test_me_rejects_invalid_active_company_selection(self):
+        user = self.user_model.objects.create_user(
+            email="scoped@test.com",
+            username="scoped",
+            password="123456",
+            global_role="provider",
+        )
+        member_company = CompanyModel.objects.create(name="Mi Empresa", nit="4001")
+        outsider_company = CompanyModel.objects.create(name="Ajena", nit="4002")
+
+        MembershipModel.objects.create(user=user, company=member_company, company_role="provider")
+
+        self.client.force_authenticate(user=user)
+        me_response = self.client.get(
+            "/api/auth/me/",
+            HTTP_X_COMPANY_ID=str(outsider_company.id),
+        )
+
+        self.assertEqual(me_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(me_response.data["detail"], "You do not have access to this tenant")
 
     def test_provider_requires_tenant_scope_to_list_users(self):
         provider = self.user_model.objects.create_user(

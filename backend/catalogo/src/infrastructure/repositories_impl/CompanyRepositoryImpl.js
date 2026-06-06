@@ -23,6 +23,7 @@ export class CompanyRepositoryImpl {
       name: company.name,
       nit: company.nit,
       status: company.status,
+      active: company.active,
       logoUrl: company.logoUrl,
     });
 
@@ -37,6 +38,7 @@ export class CompanyRepositoryImpl {
         name: company.name,
         nit: company.nit,
         status: company.status,
+        active: company.active,
         logoUrl: company.logoUrl,
       },
       { upsert: true, new: true },
@@ -47,7 +49,13 @@ export class CompanyRepositoryImpl {
     await this.pgRepository.save(company);
     await CompanyModel.findOneAndUpdate(
       { companyId: company.id },
-      { name: company.name, status: company.status, logoUrl: company.logoUrl },
+      {
+        name: company.name,
+        nit: company.nit,
+        status: company.status,
+        active: company.active,
+        logoUrl: company.logoUrl,
+      },
     );
   }
 
@@ -61,6 +69,7 @@ export class CompanyRepositoryImpl {
       pgCompany.name,
       pgCompany.nit,
       pgCompany.status,
+      pgCompany.active,
       pgCompany.createdAt,
       pgCompany.updatedAt,
       pgCompany.logoUrl,
@@ -75,6 +84,7 @@ export class CompanyRepositoryImpl {
       pgCompany.name,
       pgCompany.nit,
       pgCompany.status,
+      pgCompany.active,
       pgCompany.createdAt,
       pgCompany.updatedAt,
       pgCompany.logoUrl,
@@ -86,7 +96,10 @@ export class CompanyRepositoryImpl {
    * Para alimentar el frontend rápidamente, leemos directamente de MongoDB.
    */
   async findAll() {
-    const mongoDocs = await CompanyModel.find({ status: "ACTIVE" }).lean();
+    const mongoDocs = await CompanyModel.find({
+      status: "APPROVED",
+      active: true,
+    }).lean();
 
     return mongoDocs.map(
       (doc) =>
@@ -95,6 +108,7 @@ export class CompanyRepositoryImpl {
           doc.name,
           doc.nit,
           doc.status,
+          doc.active,
           new Date(),
           new Date(),
           doc.logoUrl,

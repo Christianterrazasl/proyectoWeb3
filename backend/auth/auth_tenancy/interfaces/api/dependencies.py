@@ -33,7 +33,7 @@ def get_login_user_handler() -> LoginUserHandler:
 
 
 def get_current_user_handler() -> GetCurrentUserHandler:
-    return GetCurrentUserHandler(DjangoUserRepository())
+    return GetCurrentUserHandler(DjangoUserRepository(), DjangoMembershipRepository(), DjangoCompanyRepository())
 
 
 def get_list_users_handler() -> ListUsersHandler:

@@ -31,6 +31,10 @@ class MembershipRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def list_active_by_user(self, user_id: int) -> list[Membership]:
+        raise NotImplementedError
+
+    @abstractmethod
     def list_company_ids_for_user(self, user_id: int) -> list[int]:
         raise NotImplementedError
 
