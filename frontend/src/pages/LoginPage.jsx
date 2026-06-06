@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { loginRequest, getMeRequest } from "../services/authApi";
 import { useAuth } from "../context/AuthContext";
+import { getDefaultRouteForUser } from "../utils/roleRouting";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -31,7 +32,7 @@ const LoginPage = () => {
 
       login({ access: data.access, refresh: data.refresh, user: userData });
 
-      navigate("/proveedor");
+      navigate(getDefaultRouteForUser(userData));
     } catch (err) {
       setError(err.message || "Error al iniciar sesión");
     } finally {

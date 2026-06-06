@@ -3,6 +3,7 @@ import Home from "./pages/Home.jsx";
 import DeudasPage from "./pages/DeudasPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import ProveedorPage from "./pages/ProveedorPage.jsx";
+import AdminPage from "./pages/AdminPage.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 export default function App() {
@@ -12,10 +13,18 @@ export default function App() {
       <Route path="/deuda/:idProveedor" element={<DeudasPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/proveedor" element={
-        <ProtectedRoute>
+        <ProtectedRoute blockAdmin>
           <ProveedorPage />
         </ProtectedRoute>
       } />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute requireAdmin>
+            <AdminPage />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }
