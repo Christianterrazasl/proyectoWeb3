@@ -1,5 +1,5 @@
 {
-  "name": "auth",
+  "name": "deudas",
   "version": "1.0.0",
   "description": "",
   "license": "ISC",
@@ -7,7 +7,11 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test",
+    "db:seed": "prisma db seed"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -17,6 +21,7 @@
     "prisma": "^6.19.3"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "supertest": "^7.1.4"
   }
 }
