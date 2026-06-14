@@ -1,9 +1,6 @@
 import base64
-from datetime import datetime, time
 from io import BytesIO
 import qrcode
-from django.utils import timezone
-from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -15,68 +12,9 @@ from ..infrastructure.repositories_impl import TransactionRepositoryImpl
 from ..application.commands import ConfirmPaymentDTO, ConfirmPaymentCommandHandler
 from ..infrastructure.rabbitmq_publisher import RabbitMQPublisher
 
-from ..application.queries import (
-    AdminTransactionFilters,
-    GetTransactionQueryHandler,
-    ListAdminTransactionsQueryHandler,
-)
+from ..application.queries import GetTransactionQueryHandler
 
-
-def _parse_filter_datetime(raw_value: str, field_name: str, end_of_day: bool = False) -> datetime:
-    """Normaliza filtros de fecha para que la API admin acepte ISO completo o solo YYYY-MM-DD."""
-    parsed_datetime = parse_datetime(raw_value)
-    if parsed_datetime:
-        return _ensure_aware_datetime(parsed_datetime)
-
-    parsed_date = parse_date(raw_value)
-    if parsed_date:
-        selected_time = time.max if end_of_day else time.min
-        return _ensure_aware_datetime(datetime.combine(parsed_date, selected_time))
-
-    raise ValueError(
-        f"El filtro '{field_name}' debe venir en formato ISO 8601 o YYYY-MM-DD."
-    )
-
-
-def _ensure_aware_datetime(value: datetime) -> datetime:
-    """Convierte fechas naive al timezone actual antes de consultar la proyección."""
-    if timezone.is_naive(value):
-        return timezone.make_aware(value, timezone.get_current_timezone())
-
-    return value
-
-
-def _normalize_status_filter(raw_status: str | None) -> str | None:
-    """Homologa el estado para que el repositorio compare contra el valor persistido."""
-    if raw_status is None:
-        return None
-
-    normalized_status = raw_status.strip().upper()
-    return normalized_status or None
-
-
-def _build_admin_transaction_filters(query_params) -> AdminTransactionFilters:
-    """Traduce query params HTTP al objeto de filtros que entiende el caso de uso admin."""
-    created_from = None
-    created_to = None
-
-    if query_params.get('from'):
-        created_from = _parse_filter_datetime(query_params.get('from'), 'from')
-
-    if query_params.get('to'):
-        created_to = _parse_filter_datetime(query_params.get('to'), 'to', end_of_day=True)
-
-    if created_from and created_to and created_from > created_to:
-        raise ValueError("El rango de fechas es inválido: 'from' no puede ser mayor que 'to'.")
-
-    return AdminTransactionFilters(
-        tenant_id=query_params.get('tenant_id') or None,
-        service_id=query_params.get('service_id') or None,
-        status=_normalize_status_filter(query_params.get('status')),
-        customer_ref=query_params.get('customer_ref') or None,
-        created_from=created_from,
-        created_to=created_to,
-    )
+from django.http import HttpResponse
 
 class CreatePaymentView(APIView):
     """
@@ -169,8 +107,6 @@ class ConfirmPaymentView(APIView):
         except Exception as e:
             return Response({"success": False, "message": "Error interno del servidor"},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-#-------------------
-# --- NUEVO CÓDIGO ---
 
 class GetPaymentView(APIView):
     """
@@ -199,36 +135,63 @@ class GetPaymentView(APIView):
                 "message": f"Error interno: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+from django.http import HttpResponse
+from ..application.queries import GetTransactionQueryHandler
 
-class AdminTransactionListView(APIView):
+class DownloadReceiptView(APIView):
     """
-    Controlador para GET /api/payments/admin/transactions.
-    `pagos` conserva esta lectura porque es el dueño de las transacciones que luego consume `reportes`.
+    Controlador para GET /api/payments/{transaction_id}/receipt
+    Devuelve un documento HTML para imprimir o descargar como PDF.
     """
+    def get(self, request, transaction_id):
+        handler = GetTransactionQueryHandler()
+        transaction = handler.execute(transaction_id)
 
-    def get(self, request):
-        try:
-            # `reportes` puede reenviar `tenant_id` cuando auth resolvió un scope por empresa.
-            # Si no llega ese filtro, la vista admin permanece global dentro de `pagos`.
-            filters = _build_admin_transaction_filters(request.query_params)
+        if not transaction or transaction.get("status") != "SUCCESS":
+            return HttpResponse("<h1>Comprobante no disponible o pago no exitoso.</h1>", status=404)
 
-            repository = TransactionRepositoryImpl()
-            handler = ListAdminTransactionsQueryHandler(repository)
-            transactions = handler.execute(filters)
-
-            return Response({
-                "success": True,
-                "data": transactions
-            }, status=status.HTTP_200_OK)
-
-        except ValueError as e:
-            return Response({
-                "success": False,
-                "message": str(e)
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        except Exception:
-            return Response({
-                "success": False,
-                "message": "Error interno del servidor"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        html_content = f"""
+        <html>
+        <head>
+            <title>Comprobante de Pago</title>
+            <style>
+                body {{ font-family: 'Arial', sans-serif; background-color: #f4f4f9; padding: 40px; }}
+                .receipt-box {{ max-width: 600px; margin: auto; background: white; padding: 30px; 
+                                border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-top: 5px solid #4CAF50; }}
+                .header {{ text-align: center; border-bottom: 1px solid #ddd; padding-bottom: 20px; }}
+                .header h1 {{ color: #4CAF50; margin: 0; }}
+                .details {{ margin-top: 20px; font-size: 16px; line-height: 1.6; }}
+                .details span {{ font-weight: bold; color: #333; }}
+                .amount {{ font-size: 24px; text-align: center; color: #2c3e50; font-weight: bold; margin: 30px 0; }}
+                .footer {{ text-align: center; font-size: 12px; color: #888; margin-top: 40px; }}
+            </style>
+        </head>
+        <body>
+            <div class="receipt-box">
+                <div class="header">
+                    <h1>Multipagos QR</h1>
+                    <p>Comprobante de Transacción Exitosa</p>
+                </div>
+                <div class="amount">
+                    Total Pagado: Bs. {transaction.get('amount')}
+                </div>
+                <div class="details">
+                    <p><span>Recibo ID:</span> {transaction.get('receipt_hash')}</p>
+                    <p><span>Transacción ID:</span> {transaction.get('id')}</p>
+                    <p><span>Código Cliente:</span> {transaction.get('customer_ref')}</p>
+                    <p><span>Fecha de Pago:</span> {transaction.get('created_at')}</p>
+                    <p><span>Empresa Destino (Tenant):</span> {transaction.get('tenant_id')}</p>
+                </div>
+                <div class="footer">
+                    Este documento es un comprobante válido generado electrónicamente.<br>
+                    Gracias por utilizar Multipagos QR.
+                </div>
+            </div>
+            <script>
+                // Opcional: Descomentar esto para que se abra la ventana de guardar PDF automáticamente
+                // window.onload = function() {{ window.print(); }}
+            </script>
+        </body>
+        </html>
+        """
+        return HttpResponse(html_content, content_type="text/html")
