@@ -7,10 +7,10 @@
  */
 export class Service {
   constructor(id, companyId, name, inputSchema, isPublished = true) {
-    this.id = id; // Formato esperado: srv-001
-    this.companyId = companyId; // ID canónico de auth para la empresa dueña del servicio
+    this.id = id;
+    this.companyId = companyId;
     this.name = name;
-    this.inputSchema = inputSchema; // Debe contener { fields: [] }
+    this.inputSchema = inputSchema;
     this.isPublished = isPublished;
   }
 }

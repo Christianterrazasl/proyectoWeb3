@@ -14,7 +14,6 @@ export class ServiceRepositoryImpl {
   }
 
   async save(service) {
-    // 1. Validar integridad referencial cruzada (Asegurarnos de que el ID de empresa no es inventado)
     const company = await this.pgCompanyRepo.findOneBy({
       id: service.companyId,
     });
@@ -22,7 +21,6 @@ export class ServiceRepositoryImpl {
     if (!company)
       throw new Error("La empresa solicitada no existe en los registros.");
 
-    // 2. Guardado relacional en Postgres
     const pgService = this.pgServiceRepo.create({
       id: service.id,
       companyId: service.companyId,
@@ -32,8 +30,6 @@ export class ServiceRepositoryImpl {
     });
     await this.pgServiceRepo.save(pgService);
 
-    // 3. CQRS: Construimos y guardamos la "Proyección" en MongoDB
-    // Aquí es donde unimos datos de tablas separadas para que el Frontend no tenga que procesarlo.
     await CatalogServiceModel.findOneAndUpdate(
       { serviceId: service.id },
       {
@@ -61,10 +57,33 @@ export class ServiceRepositoryImpl {
   }
 
   async readProjection(filter = {}) {
-    // La vista admin lee desde Mongo porque ya tiene servicio + empresa desnormalizados.
-    // `reportes` depende de esta proyección para no repetir joins ni ownership del catálogo.
     return CatalogServiceModel.find(filter, "-_id -__v")
       .sort({ companyName: 1, serviceName: 1 })
       .lean();
+  }
+  // FLUJO PROVEEDOR: Obtener solo los servicios de su empresa
+  async findByCompanyId(companyId) {
+    return await CatalogServiceModel.find({ companyId }, { _id: 0, __v: 0 });
+  }
+
+  // CONECTAR DEUDA: Obtener un solo servicio para leer sus campos requeridos (inputSchema)
+  async findById(serviceId) {
+    return await CatalogServiceModel.findOne({ serviceId }, { _id: 0, __v: 0 });
+  }
+
+  // EDICIÓN DE SERVICIO
+  async update(id, serviceData) {
+    const pgRepo = getPostgresConnection().getRepository(ServiceEntity);
+
+    const pgData = {};
+    if (serviceData.name) pgData.name = serviceData.name;
+    if (serviceData.inputSchema) pgData.inputSchema = serviceData.inputSchema;
+    if (serviceData.active !== undefined) pgData.active = serviceData.active;
+
+    await pgRepo.update({ id }, pgData);
+    await CatalogServiceModel.updateOne(
+      { serviceId: id },
+      { $set: serviceData },
+    );
   }
 }

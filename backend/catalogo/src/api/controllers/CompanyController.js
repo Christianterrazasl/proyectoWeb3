@@ -1,4 +1,6 @@
 import { Company } from "../../domain/models/Company.js";
+import { UpdateCompanyCommand } from "../../application/commands/UpdateCompanyCommand.js";
+import { UpdateServiceCommand } from "../../application/commands/UpdateServiceCommand.js";
 
 export class CompanyController {
   constructor(companyRepository, serviceRepository, createServiceHandler) {
@@ -9,7 +11,6 @@ export class CompanyController {
 
   /**
    * POST /api/admin/services
-   * Crea un servicio dentro de la empresa que auth ya validó.
    */
   async createService(req, res) {
     try {
@@ -28,11 +29,11 @@ export class CompanyController {
       if (!scopedCompany) {
         return res.status(403).json({
           success: false,
-          message: "La empresa solicitada no pertenece al contexto autenticado.",
+          message:
+            "La empresa solicitada no pertenece al contexto autenticado.",
         });
       }
 
-      // Guardamos una referencia canónica de la empresa validada por auth.
       await this.companyRepository.save(
         new Company(
           scopedCompany.id,
@@ -67,14 +68,12 @@ export class CompanyController {
 
   /**
    * GET /api/admin/services
-   * Lo consumen el panel admin y reportes para reutilizar una sola vista operativa.
-   * Catálogo expone esta lectura porque sigue siendo dueño de los metadatos del servicio.
    */
   async getAdminServices(req, res) {
     try {
-      // Solo filtramos si el cliente pidió scope explícito con el header.
-      // Sin `X-Company-Id`, el admin conserva visión global sobre todos los servicios.
-      const requestedCompanyId = req.header("x-company-id") ? req.companyId : null;
+      const requestedCompanyId = req.header("x-company-id")
+        ? req.companyId
+        : null;
 
       const services = requestedCompanyId
         ? await this.serviceRepository.findByCompanyId(requestedCompanyId)
@@ -94,13 +93,11 @@ export class CompanyController {
 
   /**
    * GET /api/catalog/services
-   * Lectura pública del catálogo.
    */
   async getCatalog(req, res) {
     try {
-      const { CatalogServiceModel } = await import(
-        "../../infrastructure/database/mongodb/CatalogServiceSchema.js"
-      );
+      const { CatalogServiceModel } =
+        await import("../../infrastructure/database/mongodb/CatalogServiceSchema.js");
 
       const catalog = await CatalogServiceModel.find({}, "-_id -__v").lean();
 
@@ -113,6 +110,55 @@ export class CompanyController {
         success: false,
         message: "Error interno al obtener el catálogo.",
       });
+    }
+  }
+
+  async updateCompany(req, res) {
+    try {
+      const command = new UpdateCompanyCommand(this.companyRepository);
+      const result = await command.execute(req.params.id, req.body);
+      res
+        .status(200)
+        .json({ success: true, message: "Empresa actualizada", data: result });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  async updateService(req, res) {
+    try {
+      const command = new UpdateServiceCommand(this.serviceRepository);
+      const result = await command.execute(req.params.id, req.body);
+      res
+        .status(200)
+        .json({ success: true, message: "Servicio actualizado", data: result });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  async getCompanyServices(req, res) {
+    try {
+      const services = await this.serviceRepository.findByCompanyId(
+        req.params.companyId,
+      );
+      res.status(200).json({ success: true, data: services });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  async getServiceById(req, res) {
+    try {
+      const service = await this.serviceRepository.findById(req.params.id);
+      if (!service)
+        return res
+          .status(404)
+          .json({ success: false, message: "Servicio no encontrado" });
+
+      res.status(200).json({ success: true, data: service });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
     }
   }
 }

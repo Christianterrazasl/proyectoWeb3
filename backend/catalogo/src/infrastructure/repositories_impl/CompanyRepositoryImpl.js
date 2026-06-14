@@ -115,4 +115,25 @@ export class CompanyRepositoryImpl {
         ),
     );
   }
+  /**
+   * Update: 13/06/2023  correciones finales
+   */
+  // Para validar existencia antes de editar
+  async findById(id) {
+    return await CompanyModel.findOne({ id });
+  }
+
+  // Doble escritura para la edición
+  async update(id, companyData) {
+    const pgRepo = getPostgresConnection().getRepository(CompanyEntity);
+
+    const pgData = {};
+    if (companyData.name) pgData.name = companyData.name;
+    if (companyData.status) pgData.status = companyData.status;
+
+    // 1. Actualiza en PostgreSQL (Fuente de verdad)
+    await pgRepo.update({ id }, pgData);
+    // 2. Actualiza en MongoDB (Lectura rápida)
+    await CompanyModel.updateOne({ id }, { $set: companyData });
+  }
 }

@@ -9,7 +9,6 @@ const router = Router();
 
 /**
  * Wiring simple del módulo catálogo.
- * Aquí conectamos infraestructura -> aplicación -> controller.
  */
 const companyRepository = new CompanyRepositoryImpl();
 const serviceRepository = new ServiceRepositoryImpl();
@@ -32,8 +31,27 @@ router.get("/admin/services", requireAdminSession, (req, res) =>
 );
 
 // Catálogo público
-router.get("/catalog/services", (req, res) =>
-  controller.getCatalog(req, res),
+router.get("/catalog/services", (req, res) => controller.getCatalog(req, res));
+
+// --- Edición ---
+router.put(
+  "/companies/:id",
+  companyController.updateCompany.bind(companyController),
+);
+router.put(
+  "/services/:id",
+  companyController.updateService.bind(companyController),
+);
+
+// --- Flujo Proveedor (Panel de control) ---
+router.get(
+  "/companies/:companyId/services",
+  companyController.getCompanyServices.bind(companyController),
+);
+
+router.get(
+  "/services/:id",
+  companyController.getServiceById.bind(companyController),
 );
 
 export default router;

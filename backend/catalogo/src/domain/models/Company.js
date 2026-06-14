@@ -7,7 +7,7 @@
  */
 export class Company {
   constructor(id, name, nit, status, active, createdAt, updatedAt, logoUrl) {
-    this.id = id; // ID canónico emitido por auth
+    this.id = id;
     this.name = name;
     this.nit = nit;
     this.status = status; // "PENDING" | "APPROVED" | "REJECTED"
@@ -17,17 +17,11 @@ export class Company {
     this.logoUrl = logoUrl;
   }
 
-  /**
-   * REGLAS DE NEGOCIO (Comportamientos)
-   * En lugar de cambiar el 'status' directamente desde los controladores,
-   * usamos métodos de dominio para encapsular la lógica.
-   */
   isActive() {
     return this.status === "APPROVED" && this.active === true;
   }
 
   syncLifecycle(status, active) {
-    // Catálogo no decide el lifecycle: solo refleja el contrato canónico resuelto en auth.
     this.status = status;
     this.active = active;
     this.updatedAt = new Date();
