@@ -1,4 +1,4 @@
-import { Company } from "../../domain/models/Company.js";
+import { Company } from "../../domain/entities/Company.js";
 import { AppDataSource } from "../database/connection.js";
 import { CompanyEntity } from "../database/postgres/CompanyEntity.js";
 import { CompanyModel } from "../database/mongodb/CompanySchema.js";
@@ -44,22 +44,6 @@ export class CompanyRepositoryImpl {
       { upsert: true, new: true },
     );
   }
-
-  async update(company) {
-    await this.pgRepository.save(company);
-    await CompanyModel.findOneAndUpdate(
-      { companyId: company.id },
-      {
-        name: company.name,
-        nit: company.nit,
-        status: company.status,
-        active: company.active,
-        logoUrl: company.logoUrl,
-      },
-    );
-  }
-
-  // === QUERIES INTERNAS PARA LÓGICA DE NEGOCIO (Usan Postgres para evitar latencia de sincronización) ===
 
   async findByNit(nit) {
     const pgCompany = await this.pgRepository.findOneBy({ nit });
@@ -115,25 +99,19 @@ export class CompanyRepositoryImpl {
         ),
     );
   }
-  /**
-   * Update: 13/06/2023  correciones finales
-   */
-  // Para validar existencia antes de editar
-  async findById(id) {
-    return await CompanyModel.findOne({ id });
-  }
 
   // Doble escritura para la edición
   async update(id, companyData) {
-    const pgRepo = getPostgresConnection().getRepository(CompanyEntity);
-
     const pgData = {};
     if (companyData.name) pgData.name = companyData.name;
+    if (companyData.nit) pgData.nit = companyData.nit;
     if (companyData.status) pgData.status = companyData.status;
+    if (companyData.active !== undefined) pgData.active = companyData.active;
+    if (companyData.logoUrl !== undefined) pgData.logoUrl = companyData.logoUrl;
 
     // 1. Actualiza en PostgreSQL (Fuente de verdad)
-    await pgRepo.update({ id }, pgData);
+    await this.pgRepository.update({ id }, pgData);
     // 2. Actualiza en MongoDB (Lectura rápida)
-    await CompanyModel.updateOne({ id }, { $set: companyData });
+    await CompanyModel.updateOne({ companyId: id }, { $set: companyData });
   }
 }

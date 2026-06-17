@@ -1,12 +1,31 @@
 import { Company } from "../../domain/models/Company.js";
 import { UpdateCompanyCommand } from "../../application/commands/UpdateCompanyCommand.js";
 import { UpdateServiceCommand } from "../../application/commands/UpdateServiceCommand.js";
+import { ListAdminServicesQuery } from "../../application/queries/ListAdminServicesQuery.js";
+import { GetCatalogQuery } from "../../application/queries/GetCatalogQuery.js";
+import { GetCompanyServicesQuery } from "../../application/queries/GetCompanyServicesQuery.js";
+import { GetServiceByIdQuery } from "../../application/queries/GetServiceByIdQuery.js";
 
 export class CompanyController {
-  constructor(companyRepository, serviceRepository, createServiceHandler) {
+  constructor(
+    companyRepository,
+    serviceRepository,
+    createServiceHandler,
+    queries = {},
+  ) {
     this.companyRepository = companyRepository;
     this.serviceRepository = serviceRepository;
     this.createServiceHandler = createServiceHandler;
+    this.listAdminServicesQuery =
+      queries.listAdminServicesQuery ??
+      new ListAdminServicesQuery(serviceRepository);
+    this.getCatalogQuery =
+      queries.getCatalogQuery ?? new GetCatalogQuery(serviceRepository);
+    this.getCompanyServicesQuery =
+      queries.getCompanyServicesQuery ??
+      new GetCompanyServicesQuery(serviceRepository);
+    this.getServiceByIdQuery =
+      queries.getServiceByIdQuery ?? new GetServiceByIdQuery(serviceRepository);
   }
 
   /**
@@ -75,9 +94,9 @@ export class CompanyController {
         ? req.companyId
         : null;
 
-      const services = requestedCompanyId
-        ? await this.serviceRepository.findByCompanyId(requestedCompanyId)
-        : await this.serviceRepository.findAll();
+      const services = await this.listAdminServicesQuery.execute({
+        companyId: requestedCompanyId,
+      });
 
       return res.status(200).json({
         success: true,
@@ -96,10 +115,7 @@ export class CompanyController {
    */
   async getCatalog(req, res) {
     try {
-      const { CatalogServiceModel } =
-        await import("../../infrastructure/database/mongodb/CatalogServiceSchema.js");
-
-      const catalog = await CatalogServiceModel.find({}, "-_id -__v").lean();
+      const catalog = await this.getCatalogQuery.execute();
 
       return res.status(200).json({
         success: true,
@@ -139,9 +155,9 @@ export class CompanyController {
 
   async getCompanyServices(req, res) {
     try {
-      const services = await this.serviceRepository.findByCompanyId(
-        req.params.companyId,
-      );
+      const services = await this.getCompanyServicesQuery.execute({
+        companyId: req.params.companyId,
+      });
       res.status(200).json({ success: true, data: services });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
@@ -150,7 +166,9 @@ export class CompanyController {
 
   async getServiceById(req, res) {
     try {
-      const service = await this.serviceRepository.findById(req.params.id);
+      const service = await this.getServiceByIdQuery.execute({
+        serviceId: req.params.id,
+      });
       if (!service)
         return res
           .status(404)

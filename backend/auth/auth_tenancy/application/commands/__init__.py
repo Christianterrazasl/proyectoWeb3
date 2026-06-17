@@ -1,11 +1,7 @@
-from .assign_membership import AssignMembershipCommand
-from .change_company_status import ChangeCompanyStatusCommand
-from .change_user_global_role import ChangeUserGlobalRoleCommand
-from .create_company import CreateCompanyCommand
-from .login_user import LoginUserCommand
-from .register_user import RegisterUserCommand
-from .update_company import UpdateCompanyCommand
-from .update_membership import UpdateMembershipCommand
+from .auth import LoginUserCommand, RegisterUserCommand
+from .company import ChangeCompanyStatusCommand, CreateCompanyCommand, UpdateCompanyCommand
+from .membership import AssignMembershipCommand, UpdateMembershipCommand
+from .user import ChangeUserGlobalRoleCommand
 
 __all__ = [
     "RegisterUserCommand",

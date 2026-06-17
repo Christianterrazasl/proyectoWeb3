@@ -47,6 +47,7 @@ __pycache__/
 *.pyo
 *.pyd
 db.sqlite3
+.atl/
 
 # Misc
 *.local

@@ -1,8 +1,53 @@
+from importlib import import_module
+
 from django.contrib.auth import get_user_model
+from django.test import SimpleTestCase
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
+from auth_tenancy.application.commands import (
+    AssignMembershipCommand,
+    ChangeUserGlobalRoleCommand,
+    CreateCompanyCommand,
+    LoginUserCommand,
+)
+from auth_tenancy.application.handlers import (
+    AssignMembershipHandler,
+    CreateCompanyHandler,
+    GetUserDetailHandler,
+    LoginUserHandler,
+)
 from auth_tenancy.infrastructure.persistence.models import CompanyModel, MembershipModel
+
+
+class ApplicationPackageLayoutTests(SimpleTestCase):
+    def test_handler_subpackages_keep_public_exports_aligned(self):
+        module_expectations = {
+            "auth_tenancy.application.handlers.auth.login_user_handler": LoginUserHandler,
+            "auth_tenancy.application.handlers.company.create_company_handler": CreateCompanyHandler,
+            "auth_tenancy.application.handlers.membership.assign_membership_handler": AssignMembershipHandler,
+            "auth_tenancy.application.handlers.user.get_user_detail_handler": GetUserDetailHandler,
+        }
+
+        for module_path, expected_class in module_expectations.items():
+            module = import_module(module_path)
+            exported_class = getattr(module, expected_class.__name__)
+
+            self.assertIs(exported_class, expected_class)
+
+    def test_command_subpackages_keep_public_exports_aligned(self):
+        module_expectations = {
+            "auth_tenancy.application.commands.auth.login_user": LoginUserCommand,
+            "auth_tenancy.application.commands.company.create_company": CreateCompanyCommand,
+            "auth_tenancy.application.commands.membership.assign_membership": AssignMembershipCommand,
+            "auth_tenancy.application.commands.user.change_user_global_role": ChangeUserGlobalRoleCommand,
+        }
+
+        for module_path, expected_class in module_expectations.items():
+            module = import_module(module_path)
+            exported_class = getattr(module, expected_class.__name__)
+
+            self.assertIs(exported_class, expected_class)
 
 
 class AuthTenancyApiTests(APITestCase):

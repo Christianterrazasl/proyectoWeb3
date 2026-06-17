@@ -1,4 +1,4 @@
-import { Service } from "../../domain/models/Service.js";
+import { Service } from "../../domain/entities/Service.js";
 import { AppDataSource } from "../database/connection.js";
 import { ServiceEntity } from "../database/postgres/ServiceEntity.js";
 import { CompanyEntity } from "../database/postgres/CompanyEntity.js";
@@ -61,10 +61,6 @@ export class ServiceRepositoryImpl {
       .sort({ companyName: 1, serviceName: 1 })
       .lean();
   }
-  // FLUJO PROVEEDOR: Obtener solo los servicios de su empresa
-  async findByCompanyId(companyId) {
-    return await CatalogServiceModel.find({ companyId }, { _id: 0, __v: 0 });
-  }
 
   // CONECTAR DEUDA: Obtener un solo servicio para leer sus campos requeridos (inputSchema)
   async findById(serviceId) {
@@ -73,14 +69,13 @@ export class ServiceRepositoryImpl {
 
   // EDICIÓN DE SERVICIO
   async update(id, serviceData) {
-    const pgRepo = getPostgresConnection().getRepository(ServiceEntity);
-
     const pgData = {};
     if (serviceData.name) pgData.name = serviceData.name;
     if (serviceData.inputSchema) pgData.inputSchema = serviceData.inputSchema;
-    if (serviceData.active !== undefined) pgData.active = serviceData.active;
+    if (serviceData.isPublished !== undefined)
+      pgData.isPublished = serviceData.isPublished;
 
-    await pgRepo.update({ id }, pgData);
+    await this.pgServiceRepo.update({ id }, pgData);
     await CatalogServiceModel.updateOne(
       { serviceId: id },
       { $set: serviceData },
