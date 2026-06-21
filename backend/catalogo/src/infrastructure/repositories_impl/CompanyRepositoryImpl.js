@@ -61,18 +61,10 @@ export class CompanyRepositoryImpl {
   }
 
   async findById(id) {
-    const pgCompany = await this.pgRepository.findOneBy({ id });
-    if (!pgCompany) return null;
-    return new Company(
-      pgCompany.id,
-      pgCompany.name,
-      pgCompany.nit,
-      pgCompany.status,
-      pgCompany.active,
-      pgCompany.createdAt,
-      pgCompany.updatedAt,
-      pgCompany.logoUrl,
-    );
+    const doc = await CompanyModel.findOne({ id });
+    if (!doc) return null;
+    // Rehidratamos el AggregateRoot
+    return new Company(doc.id, doc.name, doc.status);
   }
 
   /**
@@ -101,17 +93,12 @@ export class CompanyRepositoryImpl {
   }
 
   // Doble escritura para la edición
-  async update(id, companyData) {
-    const pgData = {};
-    if (companyData.name) pgData.name = companyData.name;
-    if (companyData.nit) pgData.nit = companyData.nit;
-    if (companyData.status) pgData.status = companyData.status;
-    if (companyData.active !== undefined) pgData.active = companyData.active;
-    if (companyData.logoUrl !== undefined) pgData.logoUrl = companyData.logoUrl;
-
-    // 1. Actualiza en PostgreSQL (Fuente de verdad)
-    await this.pgRepository.update({ id }, pgData);
-    // 2. Actualiza en MongoDB (Lectura rápida)
-    await CompanyModel.updateOne({ companyId: id }, { $set: companyData });
+  async update(id, company) {
+    const pgRepo = getPostgresConnection().getRepository(CompanyEntity);
+    await pgRepo.update({ id }, { name: company.name, status: company.status });
+    await CompanyModel.updateOne(
+      { id },
+      { $set: { name: company.name, status: company.status } },
+    );
   }
 }

@@ -1,4 +1,4 @@
-import { Service } from "../../domain/entities/Service.js";
+import { Service } from "../../domain/models/Service.js";
 import { AppDataSource } from "../database/connection.js";
 import { ServiceEntity } from "../database/postgres/ServiceEntity.js";
 import { CompanyEntity } from "../database/postgres/CompanyEntity.js";
@@ -62,23 +62,57 @@ export class ServiceRepositoryImpl {
       .lean();
   }
 
-  // CONECTAR DEUDA: Obtener un solo servicio para leer sus campos requeridos (inputSchema)
+  async findByCompanyId(companyId) {
+    return await CatalogServiceModel.find(
+      { companyId },
+      { _id: 0, __v: 0 },
+    ).lean();
+  }
+
   async findById(serviceId) {
-    return await CatalogServiceModel.findOne({ serviceId }, { _id: 0, __v: 0 });
+    const doc = await CatalogServiceModel.findOne({ serviceId });
+    if (!doc) return null;
+
+    return new Service(
+      doc.serviceId,
+      doc.companyId,
+      doc.name,
+      doc.inputSchema,
+      doc.active,
+    );
   }
 
   // EDICIÓN DE SERVICIO
   async update(id, serviceData) {
+    const pgRepo = getPostgresConnection().getRepository(ServiceEntity);
+
     const pgData = {};
     if (serviceData.name) pgData.name = serviceData.name;
     if (serviceData.inputSchema) pgData.inputSchema = serviceData.inputSchema;
-    if (serviceData.isPublished !== undefined)
-      pgData.isPublished = serviceData.isPublished;
+    if (serviceData.active !== undefined) pgData.active = serviceData.active;
 
-    await this.pgServiceRepo.update({ id }, pgData);
+    await pgRepo.update({ id }, pgData);
     await CatalogServiceModel.updateOne(
       { serviceId: id },
       { $set: serviceData },
     );
+  }
+
+  async findByIdForRead(serviceId) {
+    return await CatalogServiceModel.findOne(
+      { serviceId },
+      { _id: 0, __v: 0 },
+    ).lean();
+  }
+
+  async findAllActiveForRead() {
+    return await CatalogServiceModel.find(
+      { active: true },
+      { _id: 0, __v: 0 },
+    ).lean();
+  }
+
+  async findAllForRead() {
+    return await CatalogServiceModel.find({}, { _id: 0, __v: 0 }).lean();
   }
 }

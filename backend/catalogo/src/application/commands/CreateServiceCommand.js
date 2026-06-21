@@ -1,45 +1,22 @@
+import { CommandHandler } from "../../shared/core/CommandHandler.js";
 import { Service } from "../../domain/models/Service.js";
 
-export class CreateServiceCommandHandler {
+export class CreateServiceCommand extends CommandHandler {
   constructor(serviceRepository) {
+    super();
     this.serviceRepository = serviceRepository;
   }
 
-  async execute(dto) {
-    if (
-      !Number.isInteger(dto.companyId) ||
-      !dto.name ||
-      !dto.fields ||
-      dto.fields.length === 0
-    ) {
-      throw new Error(
-        "Datos incompletos. Un servicio requiere al menos un campo en su esquema.",
-      );
-    }
-
-    const duplicatedField = dto.fields.find(
-      (field, index) =>
-        dto.fields.findIndex((candidate) => candidate.name === field.name) !==
-        index,
+  async execute(data) {
+    const service = Service.create(
+      data.id,
+      data.companyId,
+      data.name,
+      data.inputSchema,
     );
 
-    if (duplicatedField) {
-      throw new Error("Los campos del esquema deben tener nombres únicos.");
-    }
+    await this.serviceRepository.save(service);
 
-    // TODO: Mover a generador de identificadores robusto (uuid)
-    const serviceId = `srv-${Date.now()}`;
-
-    const newService = new Service(
-      serviceId,
-      dto.companyId,
-      dto.name,
-      { fields: dto.fields },
-      dto.isPublished ?? true,
-    );
-
-    await this.serviceRepository.save(newService);
-
-    return newService;
+    return { id: service.id, name: service.name, active: service.active };
   }
 }

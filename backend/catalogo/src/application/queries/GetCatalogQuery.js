@@ -1,9 +1,12 @@
-export class GetCatalogQuery {
+import { QueryHandler } from "../../shared/core/QueryHandler.js";
+
+export class GetCatalogQuery extends QueryHandler {
   constructor(serviceRepository) {
+    super();
     this.serviceRepository = serviceRepository;
   }
 
   async execute() {
-    return this.serviceRepository.findAll();
+    return await this.serviceRepository.findAllActiveForRead();
   }
 }
