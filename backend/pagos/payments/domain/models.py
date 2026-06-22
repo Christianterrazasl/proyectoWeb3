@@ -1,33 +1,21 @@
-from datetime import datetime
+import time
 from enum import Enum
-from typing import Optional
+from datetime import datetime
+from .shared.core.aggregate_root import AggregateRoot
+from .shared.rules.string_not_null_or_empty_rule import StringNotNullOrEmptyRule
+from .shared.rules.positive_amount_rule import PositiveAmountRule
 
 
-class TransactionStatus(Enum):
+class TransactionStatus(str, Enum):
     PENDING = "PENDING"
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
 
 
-class Transaction:
-    """
-    Entidad de Dominio: Transacción
-    Representa un intento de pago mediante QR.
-    Esta clase es Python puro y no sabe nada de Django ni de bases de datos.
-    """
-
-    def __init__(
-            self,
-            id: str,  # ej: txn-12345
-            tenant_id: str,  # El ID de la empresa a la que se le paga
-            service_id: str,  # El ID del servicio (ej: srv-001)
-            customer_ref: str,  # El identificador del cliente (ej: Nro Suministro)
-            amount: float,
-            status: TransactionStatus,
-            created_at: datetime,
-            receipt_hash: Optional[str] = None  # Hash de comprobante, nulo al inicio
-    ):
-        self.id = id
+class Transaction(AggregateRoot):
+    def __init__(self, entity_id: str, tenant_id: str, service_id: str, customer_ref: str,
+                 amount: float, status: TransactionStatus, created_at: datetime, receipt_hash: str = None):
+        super().__init__(entity_id)
         self.tenant_id = tenant_id
         self.service_id = service_id
         self.customer_ref = customer_ref
@@ -36,16 +24,38 @@ class Transaction:
         self.created_at = created_at
         self.receipt_hash = receipt_hash
 
-    # === Reglas de Negocio ===
+    @staticmethod
+    def create(tenant_id: str, service_id: str, customer_ref: str, amount: float):
+        AggregateRoot.check_rule(StringNotNullOrEmptyRule(tenant_id, "tenant_id"))
+        AggregateRoot.check_rule(StringNotNullOrEmptyRule(service_id, "service_id"))
+        AggregateRoot.check_rule(StringNotNullOrEmptyRule(customer_ref, "customer_ref"))
+        AggregateRoot.check_rule(PositiveAmountRule(amount))
+
+        entity_id = f"txn-{int(time.time() * 1000)}"
+        return Transaction(
+            entity_id=entity_id,
+            tenant_id=tenant_id,
+            service_id=service_id,
+            customer_ref=customer_ref,
+            amount=amount,
+            status=TransactionStatus.PENDING,
+            created_at=datetime.now(),
+            receipt_hash=None
+        )
 
     def is_successful(self) -> bool:
         return self.status == TransactionStatus.SUCCESS
 
-    def mark_as_success(self, receipt_hash: str) -> None:
-        """Marca el pago como exitoso y asigna el hash del recibo."""
+    def mark_as_failed(self):
+        if self.status != TransactionStatus.PENDING:
+            raise ValueError("Solo se pueden rechazar transacciones que están pendientes.")
+        self.status = TransactionStatus.FAILED
+
+    def mark_as_successful(self, receipt_hash: str):
+        if self.status != TransactionStatus.PENDING:
+            raise ValueError("Solo se pueden aprobar transacciones que están pendientes.")
+
+        AggregateRoot.check_rule(StringNotNullOrEmptyRule(receipt_hash, "receipt_hash"))
+
         self.status = TransactionStatus.SUCCESS
         self.receipt_hash = receipt_hash
-
-    def mark_as_failed(self) -> None:
-        """Marca el pago como fallido."""
-        self.status = TransactionStatus.FAILED

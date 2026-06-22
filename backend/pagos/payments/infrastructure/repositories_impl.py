@@ -1,29 +1,41 @@
-from typing import Optional, List
+from datetime import datetime
 from ..domain.models import Transaction, TransactionStatus
-from ..domain.repositories import ITransactionRepository
-from .django_models import TransactionModel
+from .django_models import TransactionORM
 from .mongo_client import transactions_collection
 
 
-class TransactionRepositoryImpl(ITransactionRepository):
+class TransactionRepositoryImpl:
 
-    def save(self, transaction: Transaction) -> None:
-        # 1. Guardar en PostgreSQL (Fuente de la Verdad Transaccional)
-        # Usamos update_or_create para manejar tanto inserciones nuevas como actualizaciones
-        TransactionModel.objects.update_or_create(
+    def find_by_id(self, transaction_id: str) -> Transaction:
+        try:
+            orm_model = TransactionORM.objects.get(id=transaction_id)
+            return Transaction(
+                entity_id=orm_model.id,
+                tenant_id=orm_model.tenant_id,
+                service_id=orm_model.service_id,
+                customer_ref=orm_model.customer_ref,
+                amount=float(orm_model.amount),
+                status=TransactionStatus(orm_model.status),
+                created_at=orm_model.created_at,
+                receipt_hash=orm_model.receipt_hash
+            )
+        except TransactionORM.DoesNotExist:
+            return None
+
+    def save(self, transaction: Transaction):
+        TransactionORM.objects.update_or_create(
             id=transaction.id,
             defaults={
                 'tenant_id': transaction.tenant_id,
                 'service_id': transaction.service_id,
                 'customer_ref': transaction.customer_ref,
                 'amount': transaction.amount,
-                'status': transaction.status.value,  # Extraemos el string del Enum
-                'created_at': transaction.created_at,
+                'status': transaction.status.value,
                 'receipt_hash': transaction.receipt_hash,
+                'created_at': transaction.created_at
             }
         )
 
-        # 2. Sincronizar con MongoDB (Proyección aplanada para lecturas rápidas)
         transactions_collection.update_one(
             {'id': transaction.id},
             {'$set': {
@@ -31,31 +43,11 @@ class TransactionRepositoryImpl(ITransactionRepository):
                 'tenant_id': transaction.tenant_id,
                 'service_id': transaction.service_id,
                 'customer_ref': transaction.customer_ref,
-                'amount': float(transaction.amount),  # Mongo prefiere float estándar
+                'amount': transaction.amount,
                 'status': transaction.status.value,
-                'created_at': transaction.created_at,
                 'receipt_hash': transaction.receipt_hash,
+                'created_at': transaction.created_at.isoformat() if isinstance(transaction.created_at,
+                                                                               datetime) else transaction.created_at
             }},
-            upsert=True  # Si no existe, lo crea
+            upsert=True
         )
-
-    def find_by_id(self, transaction_id: str) -> Optional[Transaction]:
-        # Las consultas internas de validación las hacemos contra Postgres
-        try:
-            model = TransactionModel.objects.get(id=transaction_id)
-            return Transaction(
-                id=model.id,
-                tenant_id=model.tenant_id,
-                service_id=model.service_id,
-                customer_ref=model.customer_ref,
-                amount=float(model.amount),
-                status=TransactionStatus(model.status),
-                created_at=model.created_at,
-                receipt_hash=model.receipt_hash
-            )
-        except TransactionModel.DoesNotExist:
-            return None
-
-    def find_by_tenant_and_service(self, tenant_id: str, service_id: str) -> List[Transaction]:
-        # Lo dejaremos preparado por si lo necesitamos después
-        pass
