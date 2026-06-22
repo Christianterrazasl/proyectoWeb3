@@ -26,13 +26,18 @@ const LoginPage = () => {
       setError("");
       setLoading(true);
 
-      const data = await loginRequest({ email, password });
+      // Login entrega credenciales; /me entrega el contexto real que AuthContext normaliza.
+      const token = await loginRequest({ email, password });
+      const meData = await getMeRequest(token.access);
 
-      const userData = await getMeRequest(data.access);
+      login({
+        access: token.access,
+        refresh: token.refresh,
+        me: meData,
+      });
 
-      login({ access: data.access, refresh: data.refresh, user: userData });
-
-      navigate(getDefaultRouteForUser(userData));
+      // La redirección usa el mismo dato de /me para evitar divergencias entre login y guards.
+      navigate(getDefaultRouteForUser(meData), { replace: true });
     } catch (err) {
       setError(err.message || "Error al iniciar sesión");
     } finally {

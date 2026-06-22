@@ -15,6 +15,11 @@ import {
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import {
+  buildTenancyCompanies,
+  getActiveCompany,
+  getCompanyStatusLabel,
+} from "../utils/tenancyUi";
 
 const sidebarItems = [
   { label: "Resumen", icon: FiGrid, active: true },
@@ -91,13 +96,15 @@ const activityFeed = [
   },
   {
     title: "Conciliación manual requerida",
-    detail: "2 operaciones de AquaRed quedaron en revisión por timeout bancario.",
+    detail:
+      "2 operaciones de AquaRed quedaron en revisión por timeout bancario.",
     time: "Hace 11 min",
     tone: "warning",
   },
   {
     title: "Nueva empresa habilitada",
-    detail: "SaludVital quedó visible para pruebas internas del equipo operativo.",
+    detail:
+      "SaludVital quedó visible para pruebas internas del equipo operativo.",
     time: "Hace 25 min",
     tone: "success",
   },
@@ -113,7 +120,10 @@ const chartBars = [38, 52, 47, 65, 71, 58, 82];
 
 function SidebarItem({ label, icon: Icon, active = false }) {
   return (
-    <button type="button" className={`lumina-sidebar-link ${active ? "is-active" : ""}`}>
+    <button
+      type="button"
+      className={`lumina-sidebar-link ${active ? "is-active" : ""}`}
+    >
       <Icon className="text-base" />
       <span>{label}</span>
     </button>
@@ -139,7 +149,28 @@ function KpiCard({ label, value, detail, icon: Icon }) {
 
 const AdminPage = () => {
   const navigate = useNavigate();
-  const { logout, user } = useAuth();
+
+  // Este bloque YA usa datos reales de auth/tenancy.
+  // El resto del dashboard puede seguir mock hasta conectar otros microservicios.
+  const {
+    logout,
+    user,
+    memberships,
+    accessibleCompanies,
+    activeCompanyId,
+    setActiveCompany,
+  } = useAuth();
+  const tenancyCompanies = buildTenancyCompanies(
+    accessibleCompanies,
+    memberships,
+    activeCompanyId,
+  );
+
+  const activeCompany = getActiveCompany(tenancyCompanies, activeCompanyId);
+
+  const handleActiveCompanyChange = (event) => {
+    setActiveCompany(Number(event.target.value));
+  };
 
   const handleLogout = () => {
     logout();
@@ -162,16 +193,34 @@ const AdminPage = () => {
                 M
               </div>
               <div>
-                <p className="text-base font-semibold text-slate-100">MultiPagos</p>
-                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Admin console</p>
+                <p className="text-base font-semibold text-slate-100">
+                  MultiPagos
+                </p>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
+                  Admin console
+                </p>
               </div>
             </div>
 
             <div className="mt-8 rounded-[24px] border border-white/8 bg-white/[0.03] p-4">
               <p className="lumina-label text-cyan-300">Sesión</p>
-              <p className="mt-3 text-sm font-medium text-slate-100">{user?.email || "Administrador"}</p>
+              <p className="mt-3 text-sm font-medium text-slate-100">
+                {user?.email || "Administrador"}
+              </p>
               <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">
                 {user?.global_role || "admin"}
+              </p>
+
+              <p className="mt-4 text-xs uppercase tracking-[0.16em] text-slate-500">
+                Tenant activo
+              </p>
+              <p className="mt-1 text-sm font-medium text-slate-100">
+                {activeCompany?.name || "Sin tenant asignado"}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {activeCompany
+                  ? `ID ${activeCompany.id} · NIT ${activeCompany.nit}`
+                  : "Este usuario no tiene memberships activas."}
               </p>
             </div>
 
@@ -184,7 +233,10 @@ const AdminPage = () => {
 
           <div className="rounded-[24px] border border-cyan-300/12 bg-cyan-300/[0.04] p-4">
             <p className="lumina-label text-cyan-300">Estado del entorno</p>
-            <p className="mt-3 text-sm text-slate-300">Slice frontend mock listo para operación visual y demos internas.</p>
+            <p className="mt-3 text-sm text-slate-300">
+              Auth y tenancy YA vienen de la API real. Los KPIs y métricas de
+              operación siguen mock hasta conectar reportes y pagos.
+            </p>
           </div>
         </aside>
 
@@ -193,9 +245,13 @@ const AdminPage = () => {
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <p className="lumina-label text-cyan-300">Lumina overview</p>
-                <h1 className="lumina-headline mt-3 text-slate-100">Control centralizado para empresas, riesgo y operación diaria.</h1>
+                <h1 className="lumina-headline mt-3 text-slate-100">
+                  Control centralizado para empresas, riesgo y operación diaria.
+                </h1>
                 <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-300 sm:text-base">
-                  Este panel usa datos estáticos para habilitar demos, validación visual y discusión operativa mientras el backend administrativo termina de madurar.
+                  Este panel mezcla tenancy REAL desde auth con bloques mock de
+                  operación mientras el backend administrativo termina de
+                  madurar.
                 </p>
               </div>
 
@@ -204,7 +260,11 @@ const AdminPage = () => {
                   <FiRefreshCw />
                   Actualizar vista
                 </button>
-                <button type="button" className="lumina-button-primary" onClick={handleLogout}>
+                <button
+                  type="button"
+                  className="lumina-button-primary"
+                  onClick={handleLogout}
+                >
                   <FiLogOut />
                   Cerrar sesión
                 </button>
@@ -213,8 +273,8 @@ const AdminPage = () => {
 
             <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="lumina-inline-stat">
-                <FiUsers className="text-cyan-300" />
-                4 equipos monitoreando la plataforma
+                <FiUsers className="text-cyan-300" />4 equipos monitoreando la
+                plataforma
               </div>
               <div className="lumina-inline-stat">
                 <FiBriefcase className="text-cyan-300" />
@@ -231,6 +291,118 @@ const AdminPage = () => {
             </div>
           </section>
 
+          <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+            <article className="lumina-shell">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="lumina-label text-cyan-300">Tenancy real</p>
+                  <h2 className="lumina-title mt-3 text-slate-100">
+                    Contexto activo de sesión
+                  </h2>
+                </div>
+                <span className="lumina-trust-badge">Datos desde /me</span>
+              </div>
+
+              <div className="mt-6 rounded-[24px] border border-cyan-300/12 bg-cyan-300/[0.04] p-5">
+                <p className="text-xs uppercase tracking-[0.18em] text-cyan-300">
+                  Empresa activa
+                </p>
+                <h3 className="mt-3 text-2xl font-semibold text-slate-100">
+                  {activeCompany?.name || "Sin tenant activo"}
+                </h3>
+                <p className="mt-2 text-sm text-slate-300">
+                  {activeCompany
+                    ? `ID ${activeCompany.id} · NIT ${activeCompany.nit}`
+                    : "El backend no devolvió empresas accesibles para esta sesión."}
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-3 text-sm">
+                  <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-slate-200">
+                    Rol global: {user?.global_role || "sin rol"}
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-slate-200">
+                    Rol empresa: {activeCompany?.companyRole || "sin rol"}
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-slate-200">
+                    Estado:{" "}
+                    {activeCompany
+                      ? getCompanyStatusLabel(activeCompany.status)
+                      : "Sin estado"}
+                  </span>
+                </div>
+              </div>
+
+              <p className="mt-4 text-sm leading-6 text-slate-400">
+                Este bloque YA usa tenancy real. El resto del dashboard sigue
+                mock porque auth no expone KPI, riesgo, recaudación ni actividad
+                operativa.
+              </p>
+            </article>
+
+            <article className="lumina-shell">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="lumina-label text-cyan-300">
+                    Empresas accesibles
+                  </p>
+                  <h2 className="lumina-title mt-3 text-slate-100">
+                    Memberships visibles para el usuario
+                  </h2>
+                </div>
+                <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                  {tenancyCompanies.length} empresa(s)
+                </span>
+              </div>
+
+              {tenancyCompanies.length > 0 ? (
+                <div className="mt-6 grid gap-3">
+                  {tenancyCompanies.map((company) => (
+                    <div
+                      key={company.id}
+                      className={`rounded-[24px] border p-4 ${
+                        company.isActiveCompany
+                          ? "border-cyan-300/25 bg-cyan-300/10"
+                          : "border-white/8 bg-white/[0.03]"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-medium text-slate-100">
+                            {company.name}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-400">
+                            NIT {company.nit} ·{" "}
+                            {getCompanyStatusLabel(company.status)} ·{" "}
+                            {company.active ? "Activa" : "Inactiva"}
+                          </p>
+                          <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">
+                            Rol empresa · {company.companyRole}
+                          </p>
+                        </div>
+
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            company.isActiveCompany
+                              ? "bg-cyan-300/20 text-cyan-200"
+                              : "bg-white/8 text-slate-300"
+                          }`}
+                        >
+                          {company.isActiveCompany
+                            ? "Tenant activo"
+                            : "Disponible"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-6 rounded-[24px] border border-dashed border-white/10 p-5 text-sm text-slate-400">
+                  No hay empresas accesibles en la sesión actual.
+                </div>
+              )}
+            </article>
+          </section>
+
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {kpiCards.map((card) => (
               <KpiCard key={card.label} {...card} />
@@ -241,13 +413,22 @@ const AdminPage = () => {
             <article className="lumina-shell">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <p className="lumina-label text-cyan-300">Directorio de empresas</p>
-                  <h2 className="lumina-title mt-3 text-slate-100">Tenants priorizados para seguimiento</h2>
+                  <p className="lumina-label text-cyan-300">
+                    Directorio de empresas
+                  </p>
+                  <h2 className="lumina-title mt-3 text-slate-100">
+                    Tenants priorizados para seguimiento
+                  </h2>
                 </div>
 
                 <div className="relative w-full lg:max-w-xs">
                   <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input className="lumina-input pl-11" value="" readOnly placeholder="Filtrar por empresa (mock)" />
+                  <input
+                    className="lumina-input pl-11"
+                    value=""
+                    readOnly
+                    placeholder="Filtrar por empresa (mock)"
+                  />
                 </div>
               </div>
 
@@ -264,17 +445,35 @@ const AdminPage = () => {
                   {companies.map((company) => (
                     <div key={company.name} className="lumina-table-row">
                       <div>
-                        <p className="font-medium text-slate-100">{company.name}</p>
-                        <p className="mt-1 text-sm text-slate-400 md:hidden">{company.segment}</p>
+                        <p className="font-medium text-slate-100">
+                          {company.name}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-400 md:hidden">
+                          {company.segment}
+                        </p>
                       </div>
-                      <p className="hidden text-sm text-slate-300 md:block">{company.segment}</p>
+                      <p className="hidden text-sm text-slate-300 md:block">
+                        {company.segment}
+                      </p>
                       <div>
-                        <span className={`lumina-status-pill ${company.status === "Pendiente corte" ? "is-warning" : company.status === "Monitoreo" ? "is-neutral" : "is-success"}`}>
+                        <span
+                          className={`lumina-status-pill ${
+                            company.status === "Pendiente corte"
+                              ? "is-warning"
+                              : company.status === "Monitoreo"
+                                ? "is-neutral"
+                                : "is-success"
+                          }`}
+                        >
                           {company.status}
                         </span>
                       </div>
-                      <p className="text-sm text-slate-300">{company.transactions}</p>
-                      <p className="text-sm font-medium text-slate-100">{company.collection}</p>
+                      <p className="text-sm text-slate-300">
+                        {company.transactions}
+                      </p>
+                      <p className="text-sm font-medium text-slate-100">
+                        {company.collection}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -285,48 +484,73 @@ const AdminPage = () => {
               <article className="lumina-shell">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="lumina-label text-cyan-300">Analítica rápida</p>
-                    <h2 className="lumina-title mt-3 text-slate-100">Tendencia semanal</h2>
+                    <p className="lumina-label text-cyan-300">
+                      Analítica rápida
+                    </p>
+                    <h2 className="lumina-title mt-3 text-slate-100">
+                      Tendencia semanal
+                    </h2>
                   </div>
                   <span className="lumina-trust-badge">Mock data</span>
                 </div>
 
                 <div className="mt-8 flex h-56 items-end gap-3">
                   {chartBars.map((value, index) => (
-                    <div key={`${value}-${index}`} className="flex flex-1 flex-col items-center gap-3">
+                    <div
+                      key={`${value}-${index}`}
+                      className="flex flex-1 flex-col items-center gap-3"
+                    >
                       <div
                         className="w-full rounded-t-2xl bg-gradient-to-t from-cyan-400/30 via-cyan-300/55 to-indigo-400/70 shadow-[0_0_22px_rgba(34,211,238,0.16)]"
                         style={{ height: `${value * 1.8}px` }}
                       />
-                      <span className="text-xs text-slate-500">D{index + 1}</span>
+                      <span className="text-xs text-slate-500">
+                        D{index + 1}
+                      </span>
                     </div>
                   ))}
                 </div>
 
                 <p className="mt-5 text-sm leading-6 text-slate-400">
-                  Visual simple para reservar espacio a la analítica real. Cuando exista el backend, este bloque puede migrar a métricas consolidadas sin rehacer la estructura.
+                  Visual simple para reservar espacio a la analítica real.
+                  Cuando exista el backend, este bloque puede migrar a métricas
+                  consolidadas sin rehacer la estructura.
                 </p>
               </article>
 
               <article className="lumina-shell">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="lumina-label text-cyan-300">Actividad en vivo</p>
-                    <h2 className="lumina-title mt-3 text-slate-100">Operaciones recientes</h2>
+                    <p className="lumina-label text-cyan-300">
+                      Actividad en vivo
+                    </p>
+                    <h2 className="lumina-title mt-3 text-slate-100">
+                      Operaciones recientes
+                    </h2>
                   </div>
-                  <span className="text-xs uppercase tracking-[0.18em] text-emerald-300">Live mock</span>
+                  <span className="text-xs uppercase tracking-[0.18em] text-emerald-300">
+                    Live mock
+                  </span>
                 </div>
 
                 <div className="mt-6 space-y-4">
                   {activityFeed.map((item) => (
                     <div key={item.title} className="lumina-activity-item">
-                      <div className={`lumina-activity-dot ${`is-${item.tone}`}`} />
+                      <div
+                        className={`lumina-activity-dot ${`is-${item.tone}`}`}
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <p className="font-medium text-slate-100">{item.title}</p>
-                          <span className="text-xs uppercase tracking-[0.16em] text-slate-500">{item.time}</span>
+                          <p className="font-medium text-slate-100">
+                            {item.title}
+                          </p>
+                          <span className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                            {item.time}
+                          </span>
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-slate-400">{item.detail}</p>
+                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                          {item.detail}
+                        </p>
                       </div>
                     </div>
                   ))}
