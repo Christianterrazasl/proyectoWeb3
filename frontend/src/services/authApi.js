@@ -1,4 +1,5 @@
 import { AUTH_API_ROUTES } from "../config/authApiRoutes";
+import { getStoredActiveCompanyId } from "../utils/authStorage";
 
 async function parseJsonResponse(response) {
   const contentType = response.headers.get("content-type");
@@ -12,6 +13,40 @@ async function parseJsonResponse(response) {
 
 function getErrorMessage(data, fallback) {
   return data?.detail || data?.email?.[0] || data?.password?.[0] || fallback;
+}
+
+// Este helper será la base para futuras llamadas autenticadas.
+// Agrega JWT y, cuando corresponda, también X-Company-Id.
+export function buildAuthenticatedHeaders(
+  accessToken,
+  companyId = getStoredActiveCompanyId(),
+) {
+  const headers = {};
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  if (companyId !== null && companyId !== undefined && companyId !== "") {
+    headers["X-Company-Id"] = String(companyId);
+  }
+
+  return headers;
+}
+
+export function buildAuthenticatedRequestInit({
+  accessToken,
+  companyId = getStoredActiveCompanyId(),
+  headers = {},
+  ...requestInit
+} = {}) {
+  return {
+    ...requestInit,
+    headers: {
+      ...headers,
+      ...buildAuthenticatedHeaders(accessToken, companyId),
+    },
+  };
 }
 
 export async function loginRequest({ email, password }) {
@@ -39,12 +74,16 @@ export async function loginRequest({ email, password }) {
 
 export async function getMeRequest(accessToken) {
   try {
-    const response = await fetch(AUTH_API_ROUTES.me, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
+    const response = await fetch(
+      AUTH_API_ROUTES.me,
+      buildAuthenticatedRequestInit({
+        method: "GET",
+        // OJO: aquí NO mandamos X-Company-Id todavía para no romper el bootstrap
+        // si quedó una empresa vieja guardada en localStorage.
+        accessToken,
+        companyId: null,
+      }),
+    );
 
     const data = await parseJsonResponse(response);
 

@@ -1,5 +1,6 @@
 const { mapProvider, mapPublicDebt } = require("../../application/mappers/debt-presenters");
 const {
+  buildPublicDebtLookupFilters,
   isValidPublicIdentifier,
   normalizeInput,
 } = require("../../application/services/debt-payload");
@@ -7,16 +8,22 @@ const {
 function registerPublicDebtRoutes(app, { prismaClient }) {
   app.get("/debts", async (req, res) => {
     try {
-      const { customer_ref, tenant_id, status } = req.query;
+      // This public route is consumed by `pagos` during QR creation. Slice 1
+      // tightened the contract so `pagos` can ask for one exact pending debt
+      // instead of inferring ownership from customer data alone.
+      const lookupFilters = buildPublicDebtLookupFilters(req.query);
+
+      if (lookupFilters.error) {
+        return res.status(400).json({ message: lookupFilters.error });
+      }
+
       const debts = await prismaClient.debt.findMany({
-        where: {
-          ...(customer_ref ? { customer_ref: String(customer_ref) } : {}),
-          ...(tenant_id ? { tenant_id: String(tenant_id) } : {}),
-          ...(status ? { status } : {}),
-        },
+        where: lookupFilters.data,
         orderBy: { due_date: "asc" },
       });
 
+      // We intentionally return the raw debt rows here because `pagos` validates
+      // exact identity and amount from this response before creating a transaction.
       res.json(debts);
     } catch (error) {
       console.error("GET /debts", error);

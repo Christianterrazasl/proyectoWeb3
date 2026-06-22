@@ -1,5 +1,15 @@
 const DEUDAS_API_BASE = import.meta.env.VITE_DEUDAS_API_URL || "/debts";
 
+async function parseJsonResponse(response) {
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  return null;
+}
+
 export async function searchProvidersByDocument(customerRef) {
   const response = await fetch(`${DEUDAS_API_BASE}/lookup`, {
     method: "POST",
@@ -9,10 +19,7 @@ export async function searchProvidersByDocument(customerRef) {
     body: JSON.stringify({ customerRef }),
   });
 
-  const contentType = response.headers.get("content-type") || "";
-  const data = contentType.includes("application/json")
-    ? await response.json()
-    : null;
+  const data = await parseJsonResponse(response);
 
   if (!response.ok) {
     throw new Error(data?.message || "Error al buscar deudas");
@@ -23,11 +30,31 @@ export async function searchProvidersByDocument(customerRef) {
 
 export async function getPublicProviders() {
   const response = await fetch(`${DEUDAS_API_BASE}/providers`);
-  const data = await response.json();
+  const data = await parseJsonResponse(response);
 
   if (!response.ok) {
     throw new Error(data?.message || "Error al cargar proveedores");
   }
 
-  return data.data ?? [];
+  return data?.data ?? [];
+}
+
+// Este endpoint YA existe en backend y devuelve el detalle real
+// de deudas públicas por proveedor + customerRef.
+export async function getProviderCustomerDebts(tenantId, customerRef) {
+  const response = await fetch(
+    `${DEUDAS_API_BASE}/providers/${encodeURIComponent(
+      tenantId,
+    )}/customers/${encodeURIComponent(customerRef)}`,
+  );
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message || "Error al cargar las deudas del cliente",
+    );
+  }
+
+  return data?.data ?? { provider: null, customerRef, debts: [] };
 }

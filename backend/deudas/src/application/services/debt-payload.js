@@ -83,6 +83,44 @@ function isValidDebtStatus(value) {
   return VALID_DEBT_STATUSES.has(normalizeInput(value).toUpperCase());
 }
 
+function buildPublicDebtLookupFilters(query = {}) {
+  const payload = {};
+
+  if (query.id !== undefined) {
+    // `pagos` already knows the debt id it wants to pay. Validating that id at
+    // the edge keeps the cross-service contract exact and prevents a fallback to
+    // an ambiguous customer-only lookup.
+    const debtId = parseDebtId(query.id);
+
+    if (debtId === null) {
+      return { error: "El id de deuda debe ser un entero positivo" };
+    }
+
+    payload.id = debtId;
+  }
+
+  if (query.customer_ref !== undefined) {
+    payload.customer_ref = normalizeInput(query.customer_ref);
+  }
+
+  if (query.tenant_id !== undefined) {
+    payload.tenant_id = normalizeInput(query.tenant_id);
+  }
+
+  if (query.service_id !== undefined) {
+    // `service_id` matters because the same customer reference can exist in
+    // different services for the same tenant; `debt_id` is exact identity and
+    // the remaining fields confirm ownership.
+    payload.service_id = normalizeInput(query.service_id);
+  }
+
+  if (query.status !== undefined) {
+    payload.status = normalizeInput(query.status).toUpperCase();
+  }
+
+  return { data: payload };
+}
+
 function buildDebtPayload(body, { requireAllFields = false, allowStatus = true } = {}) {
   const tenantId = normalizeInput(body?.tenantId);
   const serviceId = normalizeInput(body?.serviceId);
@@ -170,6 +208,7 @@ function isPrismaNotFoundError(error) {
 
 module.exports = {
   buildDebtPayload,
+  buildPublicDebtLookupFilters,
   isPrismaNotFoundError,
   isValidDebtStatus,
   isValidPublicIdentifier,

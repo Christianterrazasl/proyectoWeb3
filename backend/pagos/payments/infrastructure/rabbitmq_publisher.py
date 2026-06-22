@@ -1,11 +1,18 @@
-import pika
 import json
 import os
+
+try:
+    import pika
+except ImportError:
+    pika = None
 
 
 class RabbitMQPublisher:
     """
-    Clase encargada de publicar Eventos de Integración hacia RabbitMQ.
+    Publishes integration events after payment completion.
+
+    The event payload comes from the `Transaction` aggregate already stored by
+    `pagos`; consumers should not reconstruct debt ownership on their side.
     """
 
     def __init__(self):
@@ -14,6 +21,9 @@ class RabbitMQPublisher:
 
     def publish_payment_completed(self, transaction):
         try:
+            if pika is None:
+                raise RuntimeError("La librería pika no está instalada.")
+
             # 1. Establecemos conexión con el servidor RabbitMQ
             connection = pika.BlockingConnection(pika.ConnectionParameters(host=self.host))
             channel = connection.channel()
@@ -28,6 +38,9 @@ class RabbitMQPublisher:
                 "event_type": "Payment.Completed",
                 "data": {
                     "transaction_id": transaction.id,
+                    # We ship the same ownership dimensions persisted with the
+                    # transaction so downstream readers do not need to query
+                    # `deudas` again just to understand who paid what.
                     "tenant_id": transaction.tenant_id,
                     "service_id": transaction.service_id,
                     "customer_ref": transaction.customer_ref,

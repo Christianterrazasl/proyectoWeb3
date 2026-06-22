@@ -8,11 +8,12 @@ from .mongo_client import transactions_collection
 class TransactionRepositoryImpl(ITransactionRepository):
 
     def save(self, transaction: Transaction) -> None:
-        # 1. Guardar en PostgreSQL (Fuente de la Verdad Transaccional)
-        # Usamos update_or_create para manejar tanto inserciones nuevas como actualizaciones
+        # PostgreSQL keeps the transactional truth used by commands such as
+        # confirmation; this is the canonical persisted version of the payment.
         TransactionModel.objects.update_or_create(
             id=transaction.id,
             defaults={
+                'debt_id': transaction.debt_id,
                 'tenant_id': transaction.tenant_id,
                 'service_id': transaction.service_id,
                 'customer_ref': transaction.customer_ref,
@@ -23,11 +24,14 @@ class TransactionRepositoryImpl(ITransactionRepository):
             }
         )
 
-        # 2. Sincronizar con MongoDB (Proyección aplanada para lecturas rápidas)
+        # Mongo receives a denormalized projection for fast reads/reporting. The
+        # same `debt_id` must travel here so future read-side features can trace
+        # the payment back to the exact debt without rebuilding identity.
         transactions_collection.update_one(
             {'id': transaction.id},
             {'$set': {
                 'id': transaction.id,
+                'debt_id': transaction.debt_id,
                 'tenant_id': transaction.tenant_id,
                 'service_id': transaction.service_id,
                 'customer_ref': transaction.customer_ref,
@@ -40,11 +44,12 @@ class TransactionRepositoryImpl(ITransactionRepository):
         )
 
     def find_by_id(self, transaction_id: str) -> Optional[Transaction]:
-        # Las consultas internas de validación las hacemos contra Postgres
+        # Commands read from Postgres because it is the write-side source of truth.
         try:
             model = TransactionModel.objects.get(id=transaction_id)
             return Transaction(
                 id=model.id,
+                debt_id=model.debt_id,
                 tenant_id=model.tenant_id,
                 service_id=model.service_id,
                 customer_ref=model.customer_ref,

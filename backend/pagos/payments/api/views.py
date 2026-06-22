@@ -1,49 +1,65 @@
 import base64
 from io import BytesIO
-import qrcode
+from types import SimpleNamespace
+
+try:
+    import qrcode
+except ImportError:
+    def _qrcode_unavailable(*_args, **_kwargs):
+        raise RuntimeError("La librería qrcode no está instalada.")
+
+    qrcode = SimpleNamespace(make=_qrcode_unavailable)
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from pydantic import ValidationError
 
-from ..application.commands import CreateTransactionDTO, CreateTransactionCommandHandler
+from ..application.commands import CreateTransactionDTO, CreateTransactionCommandHandler, DTOValidationError
 from ..infrastructure.repositories_impl import TransactionRepositoryImpl
 
-from ..application.commands import ConfirmPaymentDTO, ConfirmPaymentCommandHandler
+from ..application.commands import ConfirmPaymentDTO, ConfirmPaymentCommandHandler, DebtSyncPendingError
 from ..infrastructure.rabbitmq_publisher import RabbitMQPublisher
 
 from ..application.queries import GetTransactionQueryHandler
 
 from django.http import HttpResponse
 
+
+def _confirmation_payload(transaction):
+    receipt_available = transaction.status.value == "SUCCESS"
+    return {
+        "transaction_id": transaction.id,
+        "status": transaction.status.value,
+        "receipt_hash": transaction.receipt_hash if receipt_available else None,
+        "receipt_available": receipt_available,
+    }
+
 class CreatePaymentView(APIView):
     """
-    Controlador para POST /api/payments/qr
+    POST /api/payments/qr.
+
+    Receives frontend payment intent data, delegates the exact debt validation to
+    the application layer, and only then returns a simulated QR payload.
     """
 
     def post(self, request):
         try:
-            # 1. Validar el body de la petición usando Pydantic
-            # Si falta un campo o el 'amount' es negativo, esto lanzará un ValidationError
+            # The DTO validates caller input. The handler will then ask `deudas`
+            # for the authoritative debt row before anything is persisted.
             dto = CreateTransactionDTO(**request.data)
 
-            # 2. Inyectar dependencias y ejecutar el caso de uso
             repository = TransactionRepositoryImpl()
             handler = CreateTransactionCommandHandler(repository)
             transaction = handler.execute(dto)
 
-            # 3. Generar el código QR simulado
-            # En la vida real esto sería un string complejo del banco.
-            # Para nuestro caso de estudio, armamos una URI simulada con el ID.
+            # The QR data is derived from the transaction id generated after the
+            # exact-debt contract succeeds; it is not a source of truth itself.
             qr_data = f"multipagos://pay/{transaction.id}"
             img = qrcode.make(qr_data)
 
-            # Convertir la imagen del QR a Base64 para enviarla por JSON
             buffered = BytesIO()
             img.save(buffered, format="PNG")
             qr_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-            # 4. Formatear la respuesta para el frontend
             response_data = {
                 "success": True,
                 "message": "Intención de pago generada y QR creado.",
@@ -56,12 +72,18 @@ class CreatePaymentView(APIView):
             }
             return Response(response_data, status=status.HTTP_201_CREATED)
 
-        except ValidationError as e:
+        except DTOValidationError as e:
             # Captura errores si el JSON del frontend viene mal formado
             return Response({
                 "success": False,
                 "message": "Error de validación de datos",
                 "errors": e.errors()
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        except ValueError as e:
+            return Response({
+                "success": False,
+                "message": str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
@@ -73,8 +95,10 @@ class CreatePaymentView(APIView):
 #---------------------
 class ConfirmPaymentView(APIView):
     """
-    Controlador para POST /api/payments/confirm
-    Simula la confirmación de pago por parte del banco.
+    POST /api/payments/confirm.
+
+    Loads the stored transaction from `pagos`, runs the confirmation use case,
+    and returns the resulting payment state to the caller.
     """
 
     def post(self, request):
@@ -82,26 +106,35 @@ class ConfirmPaymentView(APIView):
             dto = ConfirmPaymentDTO(**request.data)
 
             repository = TransactionRepositoryImpl()
-            publisher = RabbitMQPublisher()  # Instanciamos nuestro megáfono
+            publisher = RabbitMQPublisher()
             handler = ConfirmPaymentCommandHandler(repository, publisher)
 
             transaction = handler.execute(dto)
 
+            message = "Pago procesado y confirmado con éxito."
+            if transaction.status.value == "FAILED":
+                message = "Pago rechazado correctamente."
+
             return Response({
                 "success": True,
-                "message": "Pago procesado y confirmado con éxito.",
-                "data": {
-                    "transaction_id": transaction.id,
-                    "status": transaction.status.value,
-                    "receipt_hash": transaction.receipt_hash
-                }
+                "message": message,
+                "data": _confirmation_payload(transaction)
             }, status=status.HTTP_200_OK)
+
+        except DebtSyncPendingError as e:
+            return Response({
+                "success": False,
+                "message": str(e),
+                "error_code": e.error_code,
+                "retryable": e.retryable,
+                "data": _confirmation_payload(e.transaction)
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         except ValueError as e:
             # Errores de negocio (ej: no existe, ya fue pagada)
             return Response({"success": False, "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        except ValidationError as e:
+        except DTOValidationError as e:
             return Response({"success": False, "errors": e.errors()}, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
@@ -110,8 +143,10 @@ class ConfirmPaymentView(APIView):
 
 class GetPaymentView(APIView):
     """
-    Controlador para GET /api/payments/{transaction_id}
-    Devuelve el estado actual de un pago.
+    GET /api/payments/{transaction_id}.
+
+    Reads the current payment snapshot from the query layer. This is a read-only
+    endpoint; it does not talk to `deudas` or mutate transaction state.
     """
     def get(self, request, transaction_id):
         try:
@@ -140,8 +175,11 @@ from ..application.queries import GetTransactionQueryHandler
 
 class DownloadReceiptView(APIView):
     """
-    Controlador para GET /api/payments/{transaction_id}/receipt
-    Devuelve un documento HTML para imprimir o descargar como PDF.
+    GET /api/payments/{transaction_id}/receipt.
+
+    Builds a simple HTML receipt from the stored transaction snapshot. Receipts
+    exist only for `SUCCESS` transactions, so the source of truth remains the
+    persisted transaction state.
     """
     def get(self, request, transaction_id):
         handler = GetTransactionQueryHandler()
