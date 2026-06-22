@@ -32,6 +32,8 @@ test("debt presenters preserve public and admin API contracts", () => {
   });
   const adminDebt = mapAdminDebt({
     id: 11,
+    tenant_id: "tenant-1",
+    customer_ref: "1234567",
     service_id: "agua",
     period: "2026-06",
     amount: 99.5,
@@ -54,7 +56,11 @@ test("debt presenters preserve public and admin API contracts", () => {
     dueDate: "2026-06-20T00:00:00.000Z",
     status: "PENDING",
   });
-  assert.deepEqual(adminDebt, publicDebt);
+  assert.deepEqual(adminDebt, {
+    ...publicDebt,
+    tenantId: "tenant-1",
+    customerRef: "1234567",
+  });
 });
 
 test("debt payload helpers keep validation behavior for ids, status, and body parsing", () => {

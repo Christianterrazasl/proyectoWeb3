@@ -15,10 +15,13 @@ app.get("/", (_req, res) => {
     routes: [
       "/api/auth",
       "/api/admin",
+      "/api/admin/debts",
       "/api/catalog",
       "/api/payments",
       "/debts",
-      "/reportes",
+      "/api/admin/reports",
+      "/api/admin/dashboard",
+      "/api/admin/audit-logs",
     ],
   });
 });
@@ -30,17 +33,36 @@ const proxy = (target, pathRewrite) =>
     ...(pathRewrite ? { pathRewrite } : {}),
   });
 
-app.use("/api/auth", proxy("http://auth:3000"));
+app.use(
+  "/api/auth",
+  proxy("http://auth:3000", {
+    "^/": "/api/auth/",
+  }),
+);
+app.use(
+  "/api/admin/debts",
+  proxy("http://deudas:3000", {
+    "^/api/admin/debts": "/admin/debts",
+  })
+);
+app.use("/api/admin/reports", proxy("http://reportes:3000"));
+app.use("/api/admin/dashboard", proxy("http://reportes:3000"));
+app.use("/api/admin/exports", proxy("http://reportes:3000"));
+app.use("/api/admin/audit-logs", proxy("http://reportes:3000"));
 app.use("/api/admin", proxy("http://catalogo:3000"));
 app.use("/api/catalog", proxy("http://catalogo:3000"));
-app.use("/api/payments", proxy("http://pagos:3000"));
+app.use(
+  "/api/payments",
+  proxy("http://pagos:3000", {
+    "^/": "/api/payments/",
+  }),
+);
 app.use(
   "/debts",
   proxy("http://deudas:3000", {
     "^/": "/debts/",
   })
 );
-app.use("/reportes", proxy("http://reportes:3000"));
 
 app.listen(PORT, () => {
   console.log(`API Gateway corriendo en http://localhost:${PORT}`);

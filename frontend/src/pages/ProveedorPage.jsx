@@ -1,13 +1,38 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { FiBriefcase, FiCheckCircle, FiClock, FiLogOut, FiPlusCircle, FiShield } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { createProviderDebt, listProviderDebts } from "../services/deudasApi";
 import {
   buildTenancyCompanies,
   getActiveCompany,
   getCompanyStatusLabel,
 } from "../utils/tenancyUi";
+
+function slugifyServiceId(value) {
+  const slug = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9._-]/g, "")
+    .slice(0, 50);
+
+  return slug || `deuda_${Date.now()}`;
+}
+
+function mapDebtToRow(debt) {
+  const status = String(debt.status || "").toUpperCase();
+
+  return {
+    id: debt.id,
+    documento: debt.customerRef,
+    concepto: debt.serviceId,
+    monto: debt.amount,
+    fecha: debt.dueDate ? String(debt.dueDate).slice(0, 10) : "—",
+    estado: status === "PAID" ? "pagada" : status === "PENDING" ? "pendiente" : status.toLowerCase(),
+  };
+}
 
 function ActiveCompanySelector({ companies, activeCompanyId, onChange }) {
   if (!companies.length) {
@@ -41,49 +66,28 @@ function ActiveCompanySelector({ companies, activeCompanyId, onChange }) {
   );
 }
 
-const deudasMock = [
-  {
-    id: 1,
-    documento: "1234567",
-    concepto: "Factura marzo 2026",
-    monto: 350,
-    fecha: "2026-04-15",
-    estado: "pendiente",
-  },
-  {
-    id: 2,
-    documento: "7654321",
-    concepto: "Servicio mensual",
-    monto: 120,
-    fecha: "2026-04-10",
-    estado: "pendiente",
-  },
-  {
-    id: 3,
-    documento: "9876543",
-    concepto: "Cuota enero",
-    monto: 80,
-    fecha: "2026-02-28",
-    estado: "pagada",
-  },
-];
-
 const ProveedorPage = () => {
   const [documento, setDocumento] = useState("");
   const [concepto, setConcepto] = useState("");
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState("");
-  const [deudas, setDeudas] = useState(deudasMock);
+  const [deudas, setDeudas] = useState([]);
   const [tab, setTab] = useState("pendientes");
   const [loading, setLoading] = useState(false);
+  const [listLoading, setListLoading] = useState(false);
   const [mensaje, setMensaje] = useState("");
 
   const navigate = useNavigate();
 
-  // Este bloque YA usa tenancy real desde auth.
-  // La carga y el listado de deudas siguen mock hasta integrar `deudas`.
-  const { logout, user, memberships, accessibleCompanies, activeCompanyId, setActiveCompany } =
-    useAuth();
+  const {
+    logout,
+    user,
+    session,
+    memberships,
+    accessibleCompanies,
+    activeCompanyId,
+    setActiveCompany,
+  } = useAuth();
 
   const tenancyCompanies = buildTenancyCompanies(
     accessibleCompanies,
@@ -93,7 +97,33 @@ const ProveedorPage = () => {
 
   const activeCompany = getActiveCompany(tenancyCompanies, activeCompanyId);
 
-  const handleCargarDeuda = (e) => {
+  const loadDebts = useCallback(async () => {
+    if (!session?.access || !activeCompanyId) {
+      setDeudas([]);
+      return;
+    }
+
+    setListLoading(true);
+
+    try {
+      const rows = await listProviderDebts({
+        accessToken: session.access,
+        companyId: activeCompanyId,
+      });
+      setDeudas(rows.map(mapDebtToRow));
+    } catch (error) {
+      setMensaje(error.message || "No se pudieron cargar las deudas");
+      setDeudas([]);
+    } finally {
+      setListLoading(false);
+    }
+  }, [session?.access, activeCompanyId]);
+
+  useEffect(() => {
+    loadDebts();
+  }, [loadDebts]);
+
+  const handleCargarDeuda = async (e) => {
     e.preventDefault();
 
     if (!documento.trim() || !concepto.trim() || !monto || !fecha) {
@@ -101,28 +131,38 @@ const ProveedorPage = () => {
       return;
     }
 
+    if (!session?.access || !activeCompanyId) {
+      setMensaje("Debes iniciar sesión con una empresa activa");
+      return;
+    }
+
     setMensaje("");
     setLoading(true);
 
-    setTimeout(() => {
-      const nuevaDeuda = {
-        id: deudas.length + 1,
-        documento: documento.trim(),
-        concepto,
-        monto: Number(monto),
-        fecha,
-        estado: "pendiente",
-      };
+    try {
+      await createProviderDebt({
+        accessToken: session.access,
+        companyId: activeCompanyId,
+        tenantId: String(activeCompanyId),
+        serviceId: slugifyServiceId(concepto),
+        customerRef: documento.trim(),
+        period: fecha.slice(0, 7),
+        amount: Number(monto),
+        dueDate: `${fecha}T00:00:00.000Z`,
+      });
 
-      setDeudas((prev) => [nuevaDeuda, ...prev]);
       setDocumento("");
       setConcepto("");
       setMonto("");
       setFecha("");
-      setMensaje("Deuda cargada correctamente (mock)");
+      setMensaje("Deuda cargada correctamente");
       setTab("pendientes");
+      await loadDebts();
+    } catch (error) {
+      setMensaje(error.message || "No se pudo cargar la deuda");
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   const deudasFiltradas = deudas.filter((d) =>
@@ -149,12 +189,12 @@ const ProveedorPage = () => {
               <div className="flex flex-wrap items-center gap-3">
                 <span className="lumina-trust-badge">Proveedor</span>
                 <span className="lumina-trust-badge">Tenancy real</span>
-                <span className="lumina-trust-badge">Mock de negocio</span>
+                <span className="lumina-trust-badge">API deudas</span>
               </div>
               <p className="lumina-label mt-6 text-cyan-300">Sesión activa</p>
               <h1 className="lumina-headline mt-4 text-slate-100">MultiPagos — Proveedor</h1>
               <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-300 sm:text-base">
-                Conservamos el contexto real de auth y tenancy mientras la carga y el listado de deudas siguen en modo mock controlado.
+                Conservamos el contexto real de auth y tenancy con carga y listado de deudas conectados al microservicio de deudas.
               </p>
             </div>
 
@@ -266,10 +306,10 @@ const ProveedorPage = () => {
               <article className="lumina-shell min-h-[400px]">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="lumina-label text-cyan-300">Carga mock</p>
+                    <p className="lumina-label text-cyan-300">Carga de deudas</p>
                     <h2 className="lumina-title mt-3 text-slate-100">Cargar deuda</h2>
                   </div>
-                  <span className="lumina-trust-badge">Mock business flow</span>
+                  <span className="lumina-trust-badge">Tenant {activeCompanyId ?? "—"}</span>
                 </div>
 
                 {loading ? (
@@ -354,7 +394,7 @@ const ProveedorPage = () => {
               <article className="lumina-shell min-h-[400px]">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="lumina-label text-cyan-300">Listado mock</p>
+                    <p className="lumina-label text-cyan-300">Listado</p>
                     <h2 className="lumina-title mt-3 text-slate-100">Deudas cargadas</h2>
                   </div>
 
@@ -376,6 +416,11 @@ const ProveedorPage = () => {
                   </div>
                 </div>
 
+                {listLoading ? (
+                  <div className="mt-6 flex min-h-[200px] items-center justify-center">
+                    <AiOutlineLoading3Quarters className="text-4xl animate-spin text-cyan-300" />
+                  </div>
+                ) : (
                 <div className="mt-6 flex flex-col gap-4">
                   {deudasFiltradas.length > 0 ? (
                     deudasFiltradas.map((deuda) => (
@@ -408,6 +453,7 @@ const ProveedorPage = () => {
                     </div>
                   )}
                 </div>
+                )}
               </article>
             </div>
           </div>

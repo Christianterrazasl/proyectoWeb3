@@ -64,61 +64,37 @@ const HomePage = () => {
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
         <section className="lumina-shell">
-          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr] xl:items-center">
+          <div className="">
             <div>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3 mb-4">
                 <div className="flex items-center gap-3 rounded-full border border-cyan-300/20 bg-slate-950/55 px-4 py-2 shadow-[0_0_30px_rgba(34,211,238,0.08)]">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-400/10 text-sm font-bold text-cyan-300">
                     M
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-100">MultiPagos</p>
-                    <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400">Acceso público</p>
+                    <p className="text-sm font-semibold text-slate-100">
+                      MultiPagos
+                    </p>
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400">
+                      Acceso público
+                    </p>
                   </div>
-                </div>
-                <span className="lumina-trust-badge">Consulta segura</span>
-                <span className="lumina-trust-badge">Flujo validado</span>
-              </div>
-
-              <div className="mt-8 max-w-3xl">
-                <p className="lumina-label text-cyan-300">Lumina public flow</p>
-                <h1 className="lumina-headline mt-4 text-slate-100">
-                  Consulta tus deudas desde una experiencia pública clara, confiable y premium.
-                </h1>
-                <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-                  Ingresa tu CI, NIT o código de cliente y te mostramos únicamente los proveedores disponibles para continuar al detalle de deudas.
-                </p>
-              </div>
-
-              <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                <div className="lumina-inline-stat">
-                  <FiShield className="text-cyan-300" /> Búsqueda pública sin sesión
-                </div>
-                <div className="lumina-inline-stat">
-                  <FiCreditCard className="text-cyan-300" /> Navegación directa a deudas
-                </div>
-                <div className="lumina-inline-stat">
-                  <FiZap className="text-cyan-300" /> Preparado para Slice 5
                 </div>
               </div>
             </div>
 
-            <aside className="lumina-card rounded-[28px] border border-white/10 bg-slate-950/65 p-5 shadow-[0_30px_120px_rgba(15,23,42,0.5)] backdrop-blur-2xl sm:p-6">
+            <div className="lumina-card rounded-[28px] border border-white/10 bg-slate-950/65 p-5 shadow-[0_30px_120px_rgba(15,23,42,0.5)] backdrop-blur-2xl sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="lumina-label text-cyan-300">Buscar deudas</p>
-                  <h2 className="lumina-title mt-3 text-slate-100">Identifica tu proveedor</h2>
-                  <p className="mt-2 text-sm text-slate-400">
-                    Usa el mismo dato de referencia que el proveedor tenga registrado.
-                  </p>
-                </div>
-                <div className="hidden rounded-full border border-cyan-300/15 bg-cyan-300/5 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-cyan-200 sm:block">
-                  Público
+                  <p className="text-[24px] font-bold text-cyan-300">Buscar deudas</p>
                 </div>
               </div>
 
               <div className="mt-6">
-                <label htmlFor="home-search" className="lumina-label mb-2 block text-slate-300">
+                <label
+                  htmlFor="home-search"
+                  className="lumina-label mb-2 block text-slate-300"
+                >
                   Documento o código de cliente
                 </label>
                 <div className="flex flex-col gap-3 sm:flex-row">
@@ -142,11 +118,7 @@ const HomePage = () => {
                   </button>
                 </div>
               </div>
-
-              <div className="mt-6 rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-4 text-sm text-slate-400">
-                Solo estamos restilizando la experiencia: la consulta pública y la navegación existente se mantienen intactas.
-              </div>
-            </aside>
+            </div>
           </div>
         </section>
 
@@ -154,11 +126,10 @@ const HomePage = () => {
           <div className="lumina-shell min-h-[420px]">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="lumina-label text-cyan-300">Resultados</p>
-                <h2 className="lumina-title mt-3 text-slate-100">Proveedores disponibles</h2>
-                <p className="mt-2 text-sm text-slate-400">
-                  Selecciona el proveedor correcto para ver las deudas reales del cliente.
-                </p>
+                <p className="text-slate-300">Resultados</p>
+                <h2 className="text-[24px] font-bold text-slate-100">
+                  Proveedores disponibles
+                </h2>
               </div>
               {hasSearched && !loading && !error && (
                 <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
@@ -223,16 +194,21 @@ const HomePage = () => {
             ) : hasSearched ? (
               <div className="mt-6 flex min-h-[320px] items-center justify-center text-center">
                 <div className="max-w-xl rounded-[24px] border border-white/8 bg-white/[0.03] px-6 py-8">
-                  <p className="text-lg font-semibold text-slate-100">Sin coincidencias</p>
+                  <p className="text-lg font-semibold text-slate-100">
+                    Sin coincidencias
+                  </p>
                   <p className="mt-3 text-sm leading-6 text-slate-400">
-                    No se encontraron deudas para el número de documento ingresado.
+                    No se encontraron deudas para el número de documento
+                    ingresado.
                   </p>
                 </div>
               </div>
             ) : (
               <div className="mt-6 flex min-h-[320px] items-center justify-center text-center">
                 <div className="max-w-xl rounded-[24px] border border-white/8 bg-white/[0.03] px-6 py-8">
-                  <p className="text-lg font-semibold text-slate-100">Tu búsqueda empieza aquí</p>
+                  <p className="text-lg font-semibold text-slate-100">
+                    Tu búsqueda empieza aquí
+                  </p>
                   <p className="mt-3 text-sm leading-6 text-slate-400">
                     Ingresa tu CI/NIT o código de cliente para ver tus deudas.
                   </p>

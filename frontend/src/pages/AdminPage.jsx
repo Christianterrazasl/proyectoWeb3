@@ -13,8 +13,11 @@ import {
   FiTrendingUp,
   FiUsers,
 } from "react-icons/fi";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { getDashboardSummary } from "../services/reportesApi";
+import { getAccessToken } from "../utils/authStorage";
 import {
   buildTenancyCompanies,
   getActiveCompany,
@@ -29,7 +32,7 @@ const sidebarItems = [
   { label: "Actividad", icon: FiActivity },
 ];
 
-const kpiCards = [
+const defaultKpiCards = [
   {
     label: "Volumen procesado",
     value: "Bs. 1.28M",
@@ -55,6 +58,37 @@ const kpiCards = [
     icon: FiBell,
   },
 ];
+
+function buildKpiCardsFromDashboard(summary) {
+  if (!summary) return defaultKpiCards;
+
+  return [
+    {
+      label: "Monto pendiente",
+      value: `Bs. ${Number(summary.pending_amount || 0).toFixed(2)}`,
+      detail: `${summary.pending_debts ?? 0} deudas pendientes`,
+      icon: FiTrendingUp,
+    },
+    {
+      label: "Empresas activas",
+      value: String(summary.active_companies ?? 0),
+      detail: `${summary.total_companies ?? 0} empresas en scope`,
+      icon: FiHome,
+    },
+    {
+      label: "Transacciones",
+      value: String(summary.total_transactions ?? 0),
+      detail: `${summary.approval_rate ?? 0}% aprobadas`,
+      icon: FiCreditCard,
+    },
+    {
+      label: "Deudas en cartera",
+      value: String(summary.total_debts ?? 0),
+      detail: `${summary.failed_transactions ?? 0} transacciones fallidas`,
+      icon: FiBell,
+    },
+  ];
+}
 
 const companies = [
   {
@@ -149,9 +183,9 @@ function KpiCard({ label, value, detail, icon: Icon }) {
 
 const AdminPage = () => {
   const navigate = useNavigate();
+  const [dashboard, setDashboard] = useState(null);
+  const [dashboardError, setDashboardError] = useState("");
 
-  // Este bloque YA usa datos reales de auth/tenancy.
-  // El resto del dashboard puede seguir mock hasta conectar otros microservicios.
   const {
     logout,
     user,
@@ -160,6 +194,38 @@ const AdminPage = () => {
     activeCompanyId,
     setActiveCompany,
   } = useAuth();
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) return;
+
+    let ignore = false;
+
+    const loadDashboard = async () => {
+      try {
+        const summary = await getDashboardSummary(token);
+        if (!ignore) {
+          setDashboard(summary);
+          setDashboardError("");
+        }
+      } catch (error) {
+        if (!ignore) {
+          setDashboardError(error.message || "No se pudo cargar el dashboard");
+        }
+      }
+    };
+
+    loadDashboard();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const kpiCards = useMemo(
+    () => buildKpiCardsFromDashboard(dashboard),
+    [dashboard],
+  );
   const tenancyCompanies = buildTenancyCompanies(
     accessibleCompanies,
     memberships,
@@ -404,6 +470,11 @@ const AdminPage = () => {
           </section>
 
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {dashboardError && (
+              <div className="md:col-span-2 xl:col-span-4 rounded-[24px] border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-100">
+                {dashboardError} — mostrando valores de respaldo.
+              </div>
+            )}
             {kpiCards.map((card) => (
               <KpiCard key={card.label} {...card} />
             ))}

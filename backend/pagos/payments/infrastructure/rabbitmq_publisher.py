@@ -53,3 +53,6 @@ class RabbitMQPublisher:
             # pero lo registramos. En un sistema real de producción, guardaríamos esto en una base de datos
             # de "eventos fallidos" para reintentarlo luego (Patrón Outbox).
             print(f"⚠️ Advertencia: No se pudo conectar a RabbitMQ. El evento se perdió. Detalles: {e}")
+
+
+RabbitMQEventPublisher = RabbitMQPublisher

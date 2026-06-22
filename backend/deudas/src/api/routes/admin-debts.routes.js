@@ -15,9 +15,42 @@ const {
   validateImportedDebtProviders,
 } = require("../../application/services/debt-import");
 
+const { requireProviderSession } = require("../middleware/requireProviderSession");
+
 function registerAdminDebtRoutes(app, { prismaClient }) {
-  app.post("/admin/debts", async (req, res) => {
-    const payload = buildDebtPayload(req.body, { requireAllFields: true });
+  const withProvider = (handler) => [requireProviderSession, handler];
+
+  app.get("/admin/debts", ...withProvider(async (req, res) => {
+    const status = normalizeInput(req.query?.status).toUpperCase() || undefined;
+    const tenantId = req.tenantId;
+
+    try {
+      const debts = await prismaClient.debt.findMany({
+        where: {
+          tenant_id: tenantId,
+          ...(status ? { status } : {}),
+        },
+        orderBy: { due_date: "desc" },
+      });
+
+      res.json({
+        success: true,
+        data: debts.map(mapAdminDebt),
+      });
+    } catch (error) {
+      console.error("GET /admin/debts", error);
+      res.status(500).json({
+        success: false,
+        message: "No se pudieron listar las deudas del proveedor",
+      });
+    }
+  }));
+
+  app.post("/admin/debts", ...withProvider(async (req, res) => {
+    const payload = buildDebtPayload(
+      { ...req.body, tenantId: req.tenantId },
+      { requireAllFields: true },
+    );
 
     if (payload.error) {
       return res.status(400).json({
@@ -54,9 +87,9 @@ function registerAdminDebtRoutes(app, { prismaClient }) {
         message: "No se pudo crear la deuda",
       });
     }
-  });
+  }));
 
-  app.patch("/admin/debts/:id", async (req, res) => {
+  app.patch("/admin/debts/:id", ...withProvider(async (req, res) => {
     const debtId = parseDebtId(req.params?.id);
 
     if (!debtId) {
@@ -113,9 +146,9 @@ function registerAdminDebtRoutes(app, { prismaClient }) {
         message: "No se pudo actualizar la deuda",
       });
     }
-  });
+  }));
 
-  app.patch("/admin/debts/:id/status", async (req, res) => {
+  app.patch("/admin/debts/:id/status", ...withProvider(async (req, res) => {
     const debtId = parseDebtId(req.params?.id);
     const status = normalizeInput(req.body?.status).toUpperCase();
 
@@ -157,9 +190,9 @@ function registerAdminDebtRoutes(app, { prismaClient }) {
         message: "No se pudo actualizar el estado de la deuda",
       });
     }
-  });
+  }));
 
-  app.post("/admin/debts/import", async (req, res) => {
+  app.post("/admin/debts/import", ...withProvider(async (req, res) => {
     const filename = normalizeInput(req.body?.filename);
     const csvContent = req.body?.csvContent;
 
@@ -193,7 +226,7 @@ function registerAdminDebtRoutes(app, { prismaClient }) {
     try {
       const providerValidationError = await validateImportedDebtProviders(
         prismaClient.provider,
-        parsedImport.data,
+        parsedImport.data.map((row) => ({ ...row, tenant_id: req.tenantId })),
       );
 
       if (providerValidationError) {
@@ -211,7 +244,10 @@ function registerAdminDebtRoutes(app, { prismaClient }) {
 
       const { importResult, importSummary } = await persistDebtImport(prismaClient, {
         filename,
-        debts: parsedImport.data,
+        debts: parsedImport.data.map((row) => ({
+          ...row,
+          tenant_id: req.tenantId,
+        })),
       });
 
       res.status(201).json({
@@ -231,7 +267,7 @@ function registerAdminDebtRoutes(app, { prismaClient }) {
         message: "No se pudo importar el lote de deudas",
       });
     }
-  });
+  }));
 }
 
 module.exports = { registerAdminDebtRoutes };

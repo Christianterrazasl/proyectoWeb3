@@ -20,15 +20,27 @@ class CreateTransactionCommandHandler(CommandHandler):
             raise ValueError("El monto proporcionado no es un número válido.")
 
         try:
-            deudas_url = f"http://deudas:3000/debts/lookup?tenantId={tenant_id}&serviceId={service_id}&customerRef={customer_ref}"
-            response = requests.get(deudas_url, timeout=5)
+            response = requests.get(
+                "http://deudas:3000/debts/lookup",
+                params={
+                    "tenantId": tenant_id,
+                    "serviceId": service_id,
+                    "customerRef": customer_ref,
+                },
+                timeout=5,
+            )
 
             if response.status_code == 404:
-                raise ValueError("La deunda no existe en los registros de la empresa.")
+                raise ValueError("La deuda no existe en los registros de la empresa.")
+
+            if not response.ok:
+                raise ValueError("No se pudo validar la deuda contra el servicio de deudas.")
 
             deuda_data = response.json().get("data", {})
             if float(deuda_data.get("amount", 0)) != amount:
-                raise ValueError(f"Monto incorrecto. La deuda real es de {deuda_data.get('amount')} Bs.")
+                raise ValueError(
+                    f"Monto incorrecto. La deuda real es de {deuda_data.get('amount')} Bs."
+                )
         except requests.RequestException:
             raise ValueError("El servicio de deudas no está disponible temporalmente.")
 
@@ -62,18 +74,6 @@ class ConfirmPaymentCommandHandler(CommandHandler):
             raw_string = f"{transaction.id}-{transaction.amount}-{time.time()}"
             receipt_hash = f"RCPT-{hashlib.sha256(raw_string.encode()).hexdigest()[:15].upper()}"
             transaction.mark_as_successful(receipt_hash)
-
-            try:
-                update_payload = {
-                    "tenantId": transaction.tenant_id,
-                    "serviceId": transaction.service_id,
-                    "customerRef": transaction.customer_ref,
-                    "status": "PAID"
-                }
-                requests.patch("http://deudas:3000/debts/update-status", json=update_payload, timeout=5)
-            except Exception as e:
-                print(f"[Warning] No se pudo notificar la liquidación al MS de Deudas: {e}")
-
             self.event_publisher.publish_payment_completed(transaction)
 
         self.transaction_repository.save(transaction)

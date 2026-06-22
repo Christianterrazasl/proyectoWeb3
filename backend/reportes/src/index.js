@@ -1,6 +1,7 @@
 import express from "express";
 import systemRoutes from "./api/routes/system.routes.js";
 import { createReportRouter } from "./api/routes/report.routes.js";
+import { startPaymentCompletedConsumer } from "./infrastructure/messaging/rabbitmq-consumer.js";
 
 export function createApp({ reportRoutesOptions } = {}) {
   const app = express();
@@ -8,7 +9,6 @@ export function createApp({ reportRoutesOptions } = {}) {
   app.disable("x-powered-by");
   app.use(express.json());
 
-  // Bootstrap fino: HTTP queda separado del crecimiento futuro de aplicación/dominio.
   app.use("/", systemRoutes);
   app.use("/api", createReportRouter(reportRoutesOptions));
   app.use((_req, res) => {
@@ -21,7 +21,13 @@ export function createApp({ reportRoutesOptions } = {}) {
   return app;
 }
 
-export function startServer({ port = process.env.PORT || 3000 } = {}) {
+export async function startServer({ port = process.env.PORT || 3000 } = {}) {
+  if (process.env.RABBITMQ_HOST || process.env.RABBITMQ_URL) {
+    startPaymentCompletedConsumer().catch((error) => {
+      console.error("[reportes] No se pudo iniciar consumer RabbitMQ:", error);
+    });
+  }
+
   const app = createApp();
 
   return app.listen(port, () => {

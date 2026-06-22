@@ -1,8 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { FiCalendar, FiCreditCard, FiFileText, FiShield } from "react-icons/fi";
+import { FiCalendar, FiCheckCircle, FiCreditCard, FiExternalLink, FiFileText, FiShield } from "react-icons/fi";
 import { getProviderCustomerDebts } from "../services/deudasApi";
+import {
+  confirmPayment,
+  createPaymentQr,
+  getReceiptUrl,
+} from "../services/pagosApi";
 
 function formatDate(value) {
   if (!value) return "Sin fecha";
@@ -36,6 +41,11 @@ const DeudasPage = () => {
   const [loading, setLoading] = useState(false);
   const [selectedDeudaId, setSelectedDeudaId] = useState(null);
   const [error, setError] = useState("");
+  const [paymentStep, setPaymentStep] = useState("idle");
+  const [paymentError, setPaymentError] = useState("");
+  const [transactionId, setTransactionId] = useState(null);
+  const [qrCode, setQrCode] = useState(null);
+  const [receiptHash, setReceiptHash] = useState(null);
 
   useEffect(() => {
     if (!idProveedor || !customerRef) {
@@ -85,6 +95,53 @@ const DeudasPage = () => {
     [deudas, selectedDeudaId],
   );
 
+  const resetPayment = () => {
+    setPaymentStep("idle");
+    setPaymentError("");
+    setTransactionId(null);
+    setQrCode(null);
+    setReceiptHash(null);
+  };
+
+  const handleGenerateQr = async () => {
+    if (!selectedDeuda || !idProveedor || !customerRef) return;
+
+    setPaymentStep("generating");
+    setPaymentError("");
+
+    try {
+      const result = await createPaymentQr({
+        tenant_id: idProveedor,
+        service_id: selectedDeuda.serviceId,
+        customer_ref: customerRef,
+        amount: selectedDeuda.amount,
+      });
+
+      setTransactionId(result.transaction_id);
+      setQrCode(result.qr_code);
+      setPaymentStep("qr_ready");
+    } catch (err) {
+      setPaymentError(err.message || "No se pudo generar el QR");
+      setPaymentStep("error");
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!transactionId) return;
+
+    setPaymentStep("confirming");
+    setPaymentError("");
+
+    try {
+      const result = await confirmPayment({ transaction_id: transactionId });
+      setReceiptHash(result.receipt_hash);
+      setPaymentStep("success");
+    } catch (err) {
+      setPaymentError(err.message || "No se pudo confirmar el pago");
+      setPaymentStep("error");
+    }
+  };
+
   return (
     <div className="lumina-page relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0">
@@ -99,15 +156,10 @@ const DeudasPage = () => {
             <div>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="lumina-trust-badge">Consulta pública</span>
-                <span className="lumina-trust-badge">Deudas reales</span>
               </div>
-              <p className="lumina-label mt-6 text-cyan-300">Resumen del cliente</p>
               <h1 className="lumina-headline mt-4 text-slate-100">
                 {provider?.name || "Consulta pública de deudas"}
               </h1>
-              <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-300 sm:text-base">
-                Revisa las obligaciones disponibles y selecciona una deuda para preparar el siguiente paso del flujo de pago.
-              </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[420px]">
@@ -155,7 +207,10 @@ const DeudasPage = () => {
                           key={deuda.id}
                           type="button"
                           className={`lumina-interactive-card cursor-pointer text-left ${selected ? "is-active" : ""}`}
-                          onClick={() => setSelectedDeudaId(deuda.id)}
+                          onClick={() => {
+                            setSelectedDeudaId(deuda.id);
+                            resetPayment();
+                          }}
                         >
                           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div>
@@ -205,10 +260,9 @@ const DeudasPage = () => {
               <article className="lumina-shell">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="lumina-label text-cyan-300">Siguiente paso</p>
-                    <h2 className="lumina-title mt-3 text-slate-100">Preparación del pago</h2>
+                    <p className="lumina-label text-cyan-300">Pago QR</p>
+                    <h2 className="lumina-title mt-3 text-slate-100">Confirmar obligación</h2>
                   </div>
-                  <span className="lumina-trust-badge">Slice 4</span>
                 </div>
 
                 {selectedDeuda ? (
@@ -239,9 +293,82 @@ const DeudasPage = () => {
                       </div>
                     </div>
 
-                    <div className="rounded-[24px] border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm leading-6 text-amber-100">
-                      Slice 4 termina aquí: ya estás leyendo deudas REALES. El QR, la confirmación, el estado y el comprobante conviene hacerlo en el Slice 5.
-                    </div>
+                    {paymentError && (
+                      <div className="rounded-[24px] border border-rose-400/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
+                        {paymentError}
+                      </div>
+                    )}
+
+                    {paymentStep === "success" ? (
+                      <div className="rounded-[24px] border border-emerald-400/30 bg-emerald-500/10 p-6">
+                        <div className="flex items-center gap-3 text-emerald-200">
+                          <FiCheckCircle className="text-2xl" />
+                          <p className="text-lg font-semibold">Pago confirmado</p>
+                        </div>
+                        <p className="mt-4 text-sm text-emerald-100">
+                          Comprobante: {receiptHash || transactionId}
+                        </p>
+                        {transactionId && (
+                          <a
+                            href={getReceiptUrl(transactionId)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="lumina-button-primary mt-6 inline-flex cursor-pointer"
+                          >
+                            <FiExternalLink />
+                            Ver comprobante
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        {paymentStep === "qr_ready" && qrCode && (
+                          <div className="flex flex-col items-center gap-4 rounded-[24px] border border-white/8 bg-white/[0.03] p-6">
+                            <img
+                              src={qrCode}
+                              alt="Código QR de pago"
+                              className="h-48 w-48 rounded-2xl bg-white p-3"
+                            />
+                            <p className="text-sm text-slate-400">
+                              Transacción: {transactionId}
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                          {paymentStep === "idle" || paymentStep === "error" ? (
+                            <button
+                              type="button"
+                              className="lumina-button-primary cursor-pointer"
+                              onClick={handleGenerateQr}
+                            >
+                              Generar QR de pago
+                            </button>
+                          ) : null}
+
+                          {paymentStep === "qr_ready" ? (
+                            <button
+                              type="button"
+                              className="lumina-button-primary cursor-pointer"
+                              onClick={handleConfirmPayment}
+                            >
+                              Confirmar pago
+                            </button>
+                          ) : null}
+
+                          {(paymentStep === "generating" || paymentStep === "confirming") && (
+                            <div className="flex items-center gap-3 text-cyan-300">
+                              <AiOutlineLoading3Quarters className="animate-spin text-xl" />
+                              <span className="text-sm">
+                                {paymentStep === "generating"
+                                  ? "Generando QR..."
+                                  : "Confirmando pago..."}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="mt-6 flex min-h-[320px] items-center justify-center rounded-[24px] border border-white/8 bg-white/[0.03] px-6 py-8 text-center text-sm leading-6 text-slate-400">

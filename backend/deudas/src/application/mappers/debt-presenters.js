@@ -22,6 +22,8 @@ function mapPublicDebt(debt) {
 function mapAdminDebt(debt) {
   return {
     id: String(debt.id),
+    tenantId: debt.tenant_id,
+    customerRef: debt.customer_ref,
     serviceId: debt.service_id,
     period: debt.period,
     amount: debt.amount,

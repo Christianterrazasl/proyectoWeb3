@@ -14,9 +14,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiamos el resto de tu código
 COPY . /app/
+RUN sed -i 's/\r$//' /app/entrypoint.sh
 
-# Exponemos el puerto de Django
-EXPOSE 8000
+# Exponemos el puerto HTTP del servicio
+EXPOSE 3000
 
-# Comando para levantar el servidor
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]

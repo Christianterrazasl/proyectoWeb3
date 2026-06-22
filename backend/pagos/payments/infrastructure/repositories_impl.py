@@ -1,6 +1,6 @@
 from datetime import datetime
 from ..domain.models import Transaction, TransactionStatus
-from .django_models import TransactionORM
+from .django_models import TransactionModel
 from .mongo_client import transactions_collection
 
 
@@ -8,7 +8,7 @@ class TransactionRepositoryImpl:
 
     def find_by_id(self, transaction_id: str) -> Transaction:
         try:
-            orm_model = TransactionORM.objects.get(id=transaction_id)
+            orm_model = TransactionModel.objects.get(id=transaction_id)
             return Transaction(
                 entity_id=orm_model.id,
                 tenant_id=orm_model.tenant_id,
@@ -19,11 +19,11 @@ class TransactionRepositoryImpl:
                 created_at=orm_model.created_at,
                 receipt_hash=orm_model.receipt_hash
             )
-        except TransactionORM.DoesNotExist:
+        except TransactionModel.DoesNotExist:
             return None
 
     def save(self, transaction: Transaction):
-        TransactionORM.objects.update_or_create(
+        TransactionModel.objects.update_or_create(
             id=transaction.id,
             defaults={
                 'tenant_id': transaction.tenant_id,

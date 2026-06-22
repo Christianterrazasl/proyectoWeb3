@@ -57,7 +57,7 @@ services:
     environment:
       SECRET_KEY: multipagos-auth-ddd-dev-secret-key
       DEBUG: "true"
-      ALLOWED_HOSTS: localhost,127.0.0.1,auth,gateway
+      ALLOWED_HOSTS: localhost,127.0.0.1,auth,auth:3000,gateway
       DB_ENGINE: postgres
       DB_NAME: multipagos_auth
       DB_USER: multipagos
@@ -137,8 +137,12 @@ services:
     depends_on:
       deudas_db:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://postgres:postgres@deudas_db:5432/deudasdb
+      RABBITMQ_HOST: rabbitmq
+      AUTH_ME_URL: http://auth:3000/api/auth/me/
       PORT: "3000"
     ports:
       - "3003:3000"
@@ -201,6 +205,14 @@ services:
 
   reportes:
     build: ./reportes
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      DEBTS_URL: http://deudas:3000/debts
+      AUTH_ME_URL: http://auth:3000/api/auth/me/
+      PORT: "3000"
     ports:
       - "3005:3000"
     restart: unless-stopped

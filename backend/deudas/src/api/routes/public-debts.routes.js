@@ -104,6 +104,86 @@ function registerPublicDebtRoutes(app, { prismaClient }) {
     }
   });
 
+  app.get("/debts/lookup", async (req, res) => {
+    const tenantId = normalizeInput(req.query?.tenantId);
+    const serviceId = normalizeInput(req.query?.serviceId);
+    const customerRef = normalizeInput(req.query?.customerRef);
+
+    if (!tenantId || !serviceId || !customerRef) {
+      return res.status(400).json({
+        success: false,
+        message: "tenantId, serviceId y customerRef son obligatorios",
+      });
+    }
+
+    try {
+      const debt = await prismaClient.debt.findFirst({
+        where: {
+          tenant_id: tenantId,
+          service_id: serviceId,
+          customer_ref: customerRef,
+          status: "PENDING",
+        },
+        orderBy: { due_date: "asc" },
+      });
+
+      if (!debt) {
+        return res.status(404).json({
+          success: false,
+          message: "No se encontró una deuda pendiente para los datos proporcionados",
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: mapPublicDebt(debt),
+      });
+    } catch (error) {
+      console.error("GET /debts/lookup", error);
+      return res.status(500).json({
+        success: false,
+        message: "No se pudo validar la deuda",
+      });
+    }
+  });
+
+  app.patch("/debts/update-status", async (req, res) => {
+    const tenantId = normalizeInput(req.body?.tenantId);
+    const serviceId = normalizeInput(req.body?.serviceId);
+    const customerRef = normalizeInput(req.body?.customerRef);
+    const status = normalizeInput(req.body?.status).toUpperCase() || "PAID";
+
+    if (!tenantId || !serviceId || !customerRef) {
+      return res.status(400).json({
+        success: false,
+        message: "tenantId, serviceId y customerRef son obligatorios",
+      });
+    }
+
+    try {
+      const result = await prismaClient.debt.updateMany({
+        where: {
+          tenant_id: tenantId,
+          service_id: serviceId,
+          customer_ref: customerRef,
+          status: "PENDING",
+        },
+        data: { status },
+      });
+
+      return res.json({
+        success: true,
+        data: { updated: result.count, status },
+      });
+    } catch (error) {
+      console.error("PATCH /debts/update-status", error);
+      return res.status(500).json({
+        success: false,
+        message: "No se pudo actualizar el estado de la deuda",
+      });
+    }
+  });
+
   app.post("/debts/lookup", async (req, res) => {
     const customerRef = normalizeInput(req.body?.customerRef);
     const serviceId = req.body?.serviceId ? normalizeInput(req.body.serviceId) : undefined;
