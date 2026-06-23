@@ -2,16 +2,25 @@ const { mapProvider, mapPublicDebt } = require("../../application/mappers/debt-p
 const {
   isValidPublicIdentifier,
   normalizeInput,
+  parseDebtId,
 } = require("../../application/services/debt-payload");
 
 function registerPublicDebtRoutes(app, { prismaClient }) {
   app.get("/debts", async (req, res) => {
     try {
-      const { customer_ref, tenant_id, status } = req.query;
+      const { customer_ref, tenant_id, service_id, status } = req.query;
+      const debtId = req.query?.id === undefined ? undefined : parseDebtId(req.query.id);
+
+      if (req.query?.id !== undefined && !debtId) {
+        return res.status(400).json({ message: "El identificador de la deuda es inválido" });
+      }
+
       const debts = await prismaClient.debt.findMany({
         where: {
+          ...(debtId ? { id: debtId } : {}),
           ...(customer_ref ? { customer_ref: String(customer_ref) } : {}),
           ...(tenant_id ? { tenant_id: String(tenant_id) } : {}),
+          ...(service_id ? { service_id: String(service_id) } : {}),
           ...(status ? { status } : {}),
         },
         orderBy: { due_date: "asc" },
@@ -55,10 +64,10 @@ function registerPublicDebtRoutes(app, { prismaClient }) {
       });
     }
 
-    if (!isValidPublicIdentifier(tenantId) || !isValidPublicIdentifier(customerRef)) {
+    if (!isValidPublicIdentifier(tenantId)) {
       return res.status(400).json({
         success: false,
-        message: "El proveedor o el identificador del cliente tienen un formato inválido",
+        message: "El proveedor tiene un formato inválido",
       });
     }
 
@@ -180,6 +189,59 @@ function registerPublicDebtRoutes(app, { prismaClient }) {
       return res.status(500).json({
         success: false,
         message: "No se pudo actualizar el estado de la deuda",
+      });
+    }
+  });
+
+  app.patch("/internal/debts/:id/status", async (req, res) => {
+    const debtId = parseDebtId(req.params?.id);
+    const status = normalizeInput(req.body?.status).toUpperCase();
+
+    if (!debtId) {
+      return res.status(400).json({
+        success: false,
+        message: "El identificador de la deuda es inválido",
+      });
+    }
+
+    if (status !== "PAID") {
+      return res.status(400).json({
+        success: false,
+        message: "La sincronización interna solo permite marcar deudas exactas como pagadas",
+      });
+    }
+
+    try {
+      // Este endpoint es solo para el flujo interno de pagos: exige que la deuda
+      // exacta siga PENDING para no confirmar cobros sobre una deuda ya cambiada.
+      const result = await prismaClient.debt.updateMany({
+        where: {
+          id: debtId,
+          status: "PENDING",
+        },
+        data: { status },
+      });
+
+      if (result.count !== 1) {
+        return res.status(409).json({
+          success: false,
+          message: "La deuda exacta ya no está pendiente y no se pudo sincronizar",
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          id: String(debtId),
+          updated: result.count,
+          status,
+        },
+      });
+    } catch (error) {
+      console.error("PATCH /internal/debts/:id/status", error);
+      return res.status(500).json({
+        success: false,
+        message: "No se pudo actualizar el estado de la deuda exacta",
       });
     }
   });

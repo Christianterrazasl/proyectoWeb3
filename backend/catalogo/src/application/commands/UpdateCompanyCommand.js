@@ -1,4 +1,4 @@
-import { CommandHandler } from "../../shared/core/CommandHandler.js";
+import { CommandHandler } from "../../shared/CommandHandler.js";
 
 export class UpdateCompanyCommand extends CommandHandler {
   constructor(companyRepository) {
@@ -10,14 +10,34 @@ export class UpdateCompanyCommand extends CommandHandler {
     const company = await this.companyRepository.findById(id);
     if (!company) throw new Error("La empresa no existe");
 
-    if (data.name) company.changeName(data.name);
+    if (data.name) {
+      if (typeof company.changeName === "function") {
+        company.changeName(data.name);
+      } else {
+        company.name = data.name;
+      }
+    }
 
     if (data.status !== undefined) {
-      data.status === "ACTIVE" ? company.activate() : company.deactivate();
+      if (data.status === "ACTIVE") {
+        if (typeof company.activate === "function") {
+          company.activate();
+        } else {
+          company.status = "ACTIVE";
+        }
+      } else if (typeof company.deactivate === "function") {
+        company.deactivate();
+      } else {
+        company.status = "INACTIVE";
+      }
     }
 
     await this.companyRepository.update(id, company);
 
-    return { id: company.id, name: company.name, status: company.status };
+    return {
+      id: company.id,
+      name: company.name,
+      ...(company.status !== undefined ? { status: company.status } : {}),
+    };
   }
 }

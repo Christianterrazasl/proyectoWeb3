@@ -83,6 +83,45 @@ test("GET /debts/providers/:tenantId/customers/:customerRef returns scoped publi
   });
 });
 
+test("GET /debts/providers/:tenantId/customers/:customerRef accepts customerRef values already accepted by lookup", async () => {
+  let debtQuery = null;
+
+  const app = createApp({
+    prismaClient: {
+      provider: {
+        findMany: async () => [],
+        findUnique: async () => ({
+          id: 7,
+          tenant_id: "1",
+          name: "Nur",
+          description: "Pago de servicios",
+          image_url: "https://placehold.net/1.png",
+          active: true,
+        }),
+      },
+      debt: {
+        findMany: async (query) => {
+          debtQuery = query;
+          return [];
+        },
+      },
+    },
+  });
+
+  const response = await request(app).get("/debts/providers/1/customers/123%20456");
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(debtQuery, {
+    where: {
+      tenant_id: "1",
+      customer_ref: "123 456",
+      status: "PENDING",
+    },
+    orderBy: { due_date: "asc" },
+  });
+  assert.equal(response.body.data.customerRef, "123 456");
+});
+
 test("GET /debts/providers/:tenantId/customers/:customerRef rejects invalid public identifiers", async () => {
   const app = createApp({
     prismaClient: {
@@ -100,11 +139,11 @@ test("GET /debts/providers/:tenantId/customers/:customerRef rejects invalid publ
     },
   });
 
-  const response = await request(app).get("/debts/providers/1/customers/123 456");
+  const response = await request(app).get("/debts/providers/tenant con espacios/customers/123456");
 
   assert.equal(response.status, 400);
   assert.equal(response.body.success, false);
-  assert.match(response.body.message, /formato inválido/i);
+  assert.match(response.body.message, /proveedor tiene un formato inválido/i);
 });
 
 test("GET /debts/providers/:tenantId/customers/:customerRef returns 404 when provider is missing or inactive", async () => {

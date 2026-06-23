@@ -5,16 +5,52 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
+from rest_framework.exceptions import AuthenticationFailed
 
+from ..domain.models import TransactionStatus
 from ..domain.shared.core.business_rule_validation_exception import BusinessRuleValidationException
-from ..application.commands import CreateTransactionCommandHandler, ConfirmPaymentCommandHandler
-from ..application.queries import GetTransactionQueryHandler
+from ..application.commands import CreateTransactionCommandHandler, ConfirmPaymentCommandHandler, DebtSyncPendingError
+from ..application.queries import GetTransactionQueryHandler, ListTransactionsQueryHandler
+from .auth import CustomJWTAuthentication
 from ..infrastructure.repositories_impl import TransactionRepositoryImpl
 from ..infrastructure.rabbitmq_publisher import RabbitMQEventPublisher
 
 # Instanciamos la infraestructura compartida para las vistas
 repo = TransactionRepositoryImpl()
 publisher = RabbitMQEventPublisher()
+
+def _get_request_scope(request) -> dict:
+    auth_result = CustomJWTAuthentication().authenticate(request)
+
+    if auth_result is None:
+        return {
+            'tenant_id': None,
+            'global_role': None,
+        }
+
+    return {
+        'tenant_id': str(request.tenant_id) if getattr(request, 'tenant_id', None) not in (None, '') else None,
+        'global_role': getattr(request, 'role', None),
+    }
+
+
+def _build_list_filters(request, scope: dict) -> dict:
+    filters = {
+        key: value
+        for key, value in request.query_params.items()
+        if value not in (None, '')
+    }
+
+    scoped_tenant_id = scope.get('tenant_id')
+    global_role = (scope.get('global_role') or '').lower()
+
+    # El listado mantiene el contrato real `GET /api/payments`, pero si la
+    # request ya viene acotada a una empresa concreta no dejamos que un caller
+    # no-admin amplíe el alcance por query params.
+    if scoped_tenant_id and (global_role != 'admin' or 'tenant_id' not in filters):
+        filters['tenant_id'] = scoped_tenant_id
+
+    return filters
 
 
 class CreatePaymentView(APIView):
@@ -56,14 +92,58 @@ class ConfirmPaymentView(APIView):
             return Response({
                 "success": True,
                 "message": f"Transacción procesada con estado: {transaction.status.value}",
-                "receipt_hash": transaction.receipt_hash
+                "transaction_status": transaction.status.value,
+                "receipt_hash": transaction.receipt_hash,
+                "receipt_available": transaction.status == TransactionStatus.SUCCESS,
             }, status=status.HTTP_200_OK)
 
+        except DebtSyncPendingError as e:
+            return Response({
+                "success": False,
+                "message": str(e),
+                "error_code": "DEBT_SYNC_PENDING",
+                "retryable": True,
+                "transaction_status": "PENDING",
+                "receipt_available": False,
+            }, status=status.HTTP_409_CONFLICT)
         except (BusinessRuleValidationException, ValueError) as e:
             return Response({"success": False, "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"success": False, "message": f"Error interno: {str(e)}"},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ListPaymentsView(APIView):
+    def get(self, request):
+        try:
+            if not request.headers.get('Authorization'):
+                return Response(
+                    {"success": False, "message": "Autorización requerida."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+
+            scope = _get_request_scope(request)
+            # El query handler recibe filtros ya "cerrados" por rol/tenant para que
+            # reportes y admin reutilicen la misma vista sin duplicar reglas de alcance.
+            filters = _build_list_filters(request, scope)
+            handler = ListTransactionsQueryHandler()
+            transactions = handler.execute(filters, scope=scope)
+
+            return Response(
+                {"success": True, "data": transactions},
+                status=status.HTTP_200_OK,
+            )
+
+        except AuthenticationFailed as error:
+            return Response(
+                {"success": False, "message": str(error)},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        except Exception as e:
+            return Response(
+                {"success": False, "message": f"Error interno: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class GetPaymentView(APIView):

@@ -3,11 +3,40 @@ const assert = require("node:assert/strict");
 const request = require("supertest");
 
 const { createApp } = require("../app");
+const { createRequireProviderSession } = require("../src/api/middleware/requireProviderSession");
+
+function createAdminApp({ prismaClient, globalRole = "provider" }) {
+  return createApp({
+    prismaClient,
+    adminDebtRoutesOptions: {
+      requireProviderSessionMiddleware: createRequireProviderSession({
+        fetchCurrentSession: async ({ authorization, companyId }) => {
+          assert.equal(authorization, "Bearer test-token");
+          assert.equal(Number.isInteger(companyId), true);
+
+          return {
+            ok: true,
+            status: 200,
+            body: {
+              user: { global_role: globalRole },
+            },
+          };
+        },
+      }),
+    },
+  });
+}
+
+function withProviderAuth(requestBuilder, companyId = "1") {
+  return requestBuilder
+    .set("Authorization", "Bearer test-token")
+    .set("X-Company-Id", String(companyId));
+}
 
 test("POST /admin/debts creates an operational debt", async () => {
   let createQuery = null;
 
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async () => [],
@@ -32,7 +61,7 @@ test("POST /admin/debts creates an operational debt", async () => {
   });
 
   const payload = {
-    tenantId: "tenant-1",
+    tenantId: "1",
     serviceId: "agua-residencial",
     customerRef: "1234567",
     period: "2026-06",
@@ -41,12 +70,12 @@ test("POST /admin/debts creates an operational debt", async () => {
     status: "PENDING",
   };
 
-  const response = await request(app).post("/admin/debts").send(payload);
+  const response = await withProviderAuth(request(app).post("/admin/debts")).send(payload);
 
   assert.equal(response.status, 201);
   assert.deepEqual(createQuery, {
     data: {
-      tenant_id: "tenant-1",
+      tenant_id: "1",
       service_id: "agua-residencial",
       customer_ref: "1234567",
       period: "2026-06",
@@ -57,6 +86,8 @@ test("POST /admin/debts creates an operational debt", async () => {
   });
   assert.deepEqual(response.body.data, {
     id: "21",
+    tenantId: "1",
+    customerRef: "1234567",
     serviceId: "agua-residencial",
     period: "2026-06",
     amount: 99.5,
@@ -68,19 +99,19 @@ test("POST /admin/debts creates an operational debt", async () => {
 test("PATCH /admin/debts/:id edits an operational debt", async () => {
   let updateQuery = null;
 
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async (query) => {
           assert.deepEqual(query, {
             where: {
               active: true,
-              tenant_id: { in: ["tenant-1", "tenant-2"] },
+               tenant_id: { in: ["1", "2"] },
             },
           });
           return [
-            { id: 1, tenant_id: "tenant-1", active: true },
-            { id: 2, tenant_id: "tenant-2", active: true },
+             { id: 1, tenant_id: "1", active: true },
+             { id: 2, tenant_id: "2", active: true },
           ];
         },
         findUnique: async () => null,
@@ -90,7 +121,7 @@ test("PATCH /admin/debts/:id edits an operational debt", async () => {
           updateQuery = query;
           return {
             id: 33,
-            tenant_id: "tenant-1",
+             tenant_id: "1",
             service_id: query.data.service_id,
             customer_ref: query.data.customer_ref,
             period: query.data.period,
@@ -103,7 +134,7 @@ test("PATCH /admin/debts/:id edits an operational debt", async () => {
     },
   });
 
-  const response = await request(app).patch("/admin/debts/33").send({
+  const response = await withProviderAuth(request(app).patch("/admin/debts/33")).send({
     serviceId: "internet-fibra",
     customerRef: "ABC123",
     period: "2026-07",
@@ -124,6 +155,8 @@ test("PATCH /admin/debts/:id edits an operational debt", async () => {
   });
   assert.deepEqual(response.body.data, {
     id: "33",
+    tenantId: "1",
+    customerRef: "ABC123",
     serviceId: "internet-fibra",
     period: "2026-07",
     amount: 150,
@@ -135,17 +168,17 @@ test("PATCH /admin/debts/:id edits an operational debt", async () => {
 test("PATCH /admin/debts/:id/status changes the debt status", async () => {
   let updateQuery = null;
 
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async (query) => {
           assert.deepEqual(query, {
             where: {
               active: true,
-              tenant_id: { in: ["tenant-1"] },
+               tenant_id: { in: ["1"] },
             },
           });
-          return [{ id: 1, tenant_id: "tenant-1", active: true }];
+           return [{ id: 1, tenant_id: "1", active: true }];
         },
         findUnique: async () => null,
       },
@@ -154,7 +187,7 @@ test("PATCH /admin/debts/:id/status changes the debt status", async () => {
           updateQuery = query;
           return {
             id: 45,
-            tenant_id: "tenant-2",
+             tenant_id: "2",
             service_id: "gas",
             customer_ref: "9988",
             period: "2026-05",
@@ -167,7 +200,7 @@ test("PATCH /admin/debts/:id/status changes the debt status", async () => {
     },
   });
 
-  const response = await request(app).patch("/admin/debts/45/status").send({
+  const response = await withProviderAuth(request(app).patch("/admin/debts/45/status")).send({
     status: "PAID",
   });
 
@@ -180,19 +213,19 @@ test("PATCH /admin/debts/:id/status changes the debt status", async () => {
 });
 
 test("PATCH /admin/debts/:id returns 404 when Prisma reports a missing debt", async () => {
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async (query) => {
           assert.deepEqual(query, {
             where: {
               active: true,
-              tenant_id: { in: ["tenant-1", "tenant-2"] },
+               tenant_id: { in: ["1", "2"] },
             },
           });
           return [
-            { id: 1, tenant_id: "tenant-1", active: true },
-            { id: 2, tenant_id: "tenant-2", active: true },
+             { id: 1, tenant_id: "1", active: true },
+             { id: 2, tenant_id: "2", active: true },
           ];
         },
         findUnique: async () => null,
@@ -207,7 +240,7 @@ test("PATCH /admin/debts/:id returns 404 when Prisma reports a missing debt", as
     },
   });
 
-  const response = await request(app).patch("/admin/debts/99").send({
+  const response = await withProviderAuth(request(app).patch("/admin/debts/99")).send({
     amount: 200,
   });
 
@@ -217,17 +250,17 @@ test("PATCH /admin/debts/:id returns 404 when Prisma reports a missing debt", as
 });
 
 test("PATCH /admin/debts/:id/status returns 404 when Prisma reports a missing debt", async () => {
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async (query) => {
           assert.deepEqual(query, {
             where: {
               active: true,
-              tenant_id: { in: ["tenant-1"] },
+               tenant_id: { in: ["1"] },
             },
           });
-          return [{ id: 1, tenant_id: "tenant-1", active: true }];
+           return [{ id: 1, tenant_id: "1", active: true }];
         },
         findUnique: async () => null,
       },
@@ -241,7 +274,7 @@ test("PATCH /admin/debts/:id/status returns 404 when Prisma reports a missing de
     },
   });
 
-  const response = await request(app).patch("/admin/debts/99/status").send({
+  const response = await withProviderAuth(request(app).patch("/admin/debts/99/status")).send({
     status: "PAID",
   });
 
@@ -253,19 +286,19 @@ test("PATCH /admin/debts/:id/status returns 404 when Prisma reports a missing de
 test("PATCH /admin/debts/:id/status rejects an invalid debt status", async () => {
   let updateWasCalled = false;
 
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async (query) => {
           assert.deepEqual(query, {
             where: {
               active: true,
-              tenant_id: { in: ["tenant-1", "tenant-2"] },
+               tenant_id: { in: ["1", "2"] },
             },
           });
           return [
-            { id: 1, tenant_id: "tenant-1", active: true },
-            { id: 2, tenant_id: "tenant-2", active: true },
+             { id: 1, tenant_id: "1", active: true },
+             { id: 2, tenant_id: "2", active: true },
           ];
         },
         findUnique: async () => null,
@@ -279,7 +312,7 @@ test("PATCH /admin/debts/:id/status rejects an invalid debt status", async () =>
     },
   });
 
-  const response = await request(app).patch("/admin/debts/45/status").send({
+  const response = await withProviderAuth(request(app).patch("/admin/debts/45/status")).send({
     status: "ARCHIVED",
   });
 
@@ -292,17 +325,17 @@ test("PATCH /admin/debts/:id/status rejects an invalid debt status", async () =>
 test("PATCH /admin/debts/:id rejects status changes outside the dedicated status route", async () => {
   let updateWasCalled = false;
 
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async (query) => {
           assert.deepEqual(query, {
             where: {
               active: true,
-              tenant_id: { in: ["tenant-1"] },
+               tenant_id: { in: ["1"] },
             },
           });
-          return [{ id: 1, tenant_id: "tenant-1", active: true }];
+           return [{ id: 1, tenant_id: "1", active: true }];
         },
         findUnique: async () => null,
       },
@@ -315,7 +348,7 @@ test("PATCH /admin/debts/:id rejects status changes outside the dedicated status
     },
   });
 
-  const response = await request(app).patch("/admin/debts/33").send({
+  const response = await withProviderAuth(request(app).patch("/admin/debts/33")).send({
     status: "PAID",
   });
 
@@ -328,7 +361,7 @@ test("PATCH /admin/debts/:id rejects status changes outside the dedicated status
 test("POST /admin/debts rejects invalid operational input", async () => {
   let createWasCalled = false;
 
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async () => [],
@@ -343,8 +376,8 @@ test("POST /admin/debts rejects invalid operational input", async () => {
     },
   });
 
-  const response = await request(app).post("/admin/debts").send({
-    tenantId: "tenant-1",
+  const response = await withProviderAuth(request(app).post("/admin/debts")).send({
+    tenantId: "1",
     serviceId: "agua-residencial",
     customerRef: "1234567",
     period: "2026-06",
@@ -359,15 +392,15 @@ test("POST /admin/debts rejects invalid operational input", async () => {
 });
 
 test("POST /admin/debts rejects unknown or inactive providers", async () => {
-  for (const provider of [null, { id: 5, tenant_id: "tenant-1", active: false }]) {
+  for (const provider of [null, { id: 5, tenant_id: "1", active: false }]) {
     let createWasCalled = false;
 
-    const app = createApp({
+    const app = createAdminApp({
       prismaClient: {
         provider: {
           findMany: async () => [],
           findUnique: async (query) => {
-            assert.deepEqual(query, { where: { tenant_id: "tenant-1" } });
+            assert.deepEqual(query, { where: { tenant_id: "1" } });
             return provider;
           },
         },
@@ -380,8 +413,8 @@ test("POST /admin/debts rejects unknown or inactive providers", async () => {
       },
     });
 
-    const response = await request(app).post("/admin/debts").send({
-      tenantId: "tenant-1",
+    const response = await withProviderAuth(request(app).post("/admin/debts")).send({
+      tenantId: "1",
       serviceId: "agua-residencial",
       customerRef: "1234567",
       period: "2026-06",
@@ -400,7 +433,7 @@ test("POST /admin/debts rejects unknown or inactive providers", async () => {
 test("PATCH /admin/debts/:id rejects impossible due dates instead of normalizing them", async () => {
   let updateWasCalled = false;
 
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async () => [],
@@ -415,7 +448,7 @@ test("PATCH /admin/debts/:id rejects impossible due dates instead of normalizing
     },
   });
 
-  const response = await request(app).patch("/admin/debts/33").send({
+  const response = await withProviderAuth(request(app).patch("/admin/debts/33")).send({
     dueDate: "2026-02-31T00:00:00.000Z",
   });
 
@@ -429,14 +462,14 @@ test("PATCH /admin/debts/:id revalidates the provider when tenantId changes", as
   let updateQuery = null;
   let providerLookupCount = 0;
 
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async () => [],
         findUnique: async (query) => {
           providerLookupCount += 1;
-          assert.deepEqual(query, { where: { tenant_id: "tenant-2" } });
-          return { id: 2, tenant_id: "tenant-2", active: true };
+          assert.deepEqual(query, { where: { tenant_id: "2" } });
+          return { id: 2, tenant_id: "2", active: true };
         },
       },
       debt: {
@@ -457,15 +490,15 @@ test("PATCH /admin/debts/:id revalidates the provider when tenantId changes", as
     },
   });
 
-  const response = await request(app).patch("/admin/debts/33").send({
-    tenantId: "tenant-2",
+  const response = await withProviderAuth(request(app).patch("/admin/debts/33")).send({
+    tenantId: "2",
   });
 
   assert.equal(response.status, 200);
   assert.deepEqual(updateQuery, {
     where: { id: 33 },
     data: {
-      tenant_id: "tenant-2",
+      tenant_id: "2",
     },
   });
   assert.equal(providerLookupCount, 1);
@@ -473,17 +506,17 @@ test("PATCH /admin/debts/:id revalidates the provider when tenantId changes", as
 });
 
 test("PATCH /admin/debts/:id rejects tenantId changes when the provider is inactive or missing", async () => {
-  for (const provider of [null, { id: 2, tenant_id: "tenant-2", active: false }]) {
+  for (const provider of [null, { id: 2, tenant_id: "2", active: false }]) {
     let updateWasCalled = false;
     let providerLookupCount = 0;
 
-    const app = createApp({
+    const app = createAdminApp({
       prismaClient: {
         provider: {
           findMany: async () => [],
           findUnique: async (query) => {
             providerLookupCount += 1;
-            assert.deepEqual(query, { where: { tenant_id: "tenant-2" } });
+            assert.deepEqual(query, { where: { tenant_id: "2" } });
             return provider;
           },
         },
@@ -496,8 +529,8 @@ test("PATCH /admin/debts/:id rejects tenantId changes when the provider is inact
       },
     });
 
-    const response = await request(app).patch("/admin/debts/33").send({
-      tenantId: "tenant-2",
+    const response = await withProviderAuth(request(app).patch("/admin/debts/33")).send({
+      tenantId: "2",
     });
 
     assert.equal(response.status, 400);
@@ -512,19 +545,19 @@ test("POST /admin/debts/import imports a CSV batch and stores the import summary
   let createManyQuery = null;
   let importCreateQuery = null;
 
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async (query) => {
           assert.deepEqual(query, {
             where: {
               active: true,
-              tenant_id: { in: ["tenant-1", "tenant-2"] },
+               tenant_id: { in: ["1"] },
             },
           });
           return [
-            { id: 1, tenant_id: "tenant-1", active: true },
-            { id: 2, tenant_id: "tenant-2", active: true },
+             { id: 1, tenant_id: "1", active: true },
+             { id: 2, tenant_id: "2", active: true },
           ];
         },
         findUnique: async () => null,
@@ -549,12 +582,12 @@ test("POST /admin/debts/import imports a CSV batch and stores the import summary
     },
   });
 
-  const response = await request(app).post("/admin/debts/import").send({
+  const response = await withProviderAuth(request(app).post("/admin/debts/import")).send({
     filename: "deudas-junio.csv",
     csvContent: [
       "tenantId,serviceId,customerRef,period,amount,dueDate,status",
-      "tenant-1,agua,123456,2026-06,99.5,2026-06-20T00:00:00.000Z,PENDING",
-      "tenant-2,internet,ABC123,2026-07,150,2026-07-10T00:00:00.000Z,PAID",
+      "1,agua,123456,2026-06,99.5,2026-06-20T00:00:00.000Z,PENDING",
+      "2,internet,ABC123,2026-07,150,2026-07-10T00:00:00.000Z,PAID",
     ].join("\n"),
   });
 
@@ -562,7 +595,7 @@ test("POST /admin/debts/import imports a CSV batch and stores the import summary
   assert.deepEqual(createManyQuery, {
     data: [
       {
-        tenant_id: "tenant-1",
+        tenant_id: "1",
         service_id: "agua",
         customer_ref: "123456",
         period: "2026-06",
@@ -571,7 +604,7 @@ test("POST /admin/debts/import imports a CSV batch and stores the import summary
         status: "PENDING",
       },
       {
-        tenant_id: "tenant-2",
+        tenant_id: "1",
         service_id: "internet",
         customer_ref: "ABC123",
         period: "2026-07",
@@ -604,7 +637,7 @@ test("POST /admin/debts/import returns 400 when the CSV headers do not match the
   let createManyWasCalled = false;
   let importWasCalled = false;
 
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async () => [],
@@ -625,11 +658,11 @@ test("POST /admin/debts/import returns 400 when the CSV headers do not match the
     },
   });
 
-  const response = await request(app).post("/admin/debts/import").send({
+  const response = await withProviderAuth(request(app).post("/admin/debts/import")).send({
     filename: "deudas-invalidas.csv",
     csvContent: [
       "tenantId,serviceId,customerRef,period,amount,dueDate",
-      "tenant-1,agua,123456,2026-06,99.5,2026-06-20T00:00:00.000Z",
+      "1,agua,123456,2026-06,99.5,2026-06-20T00:00:00.000Z",
     ].join("\n"),
   });
 
@@ -644,7 +677,7 @@ test("POST /admin/debts/import returns 400 for an invalid row and stores the fai
   let createManyWasCalled = false;
   let importCreateQuery = null;
 
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async () => [],
@@ -670,11 +703,11 @@ test("POST /admin/debts/import returns 400 for an invalid row and stores the fai
     },
   });
 
-  const response = await request(app).post("/admin/debts/import").send({
+  const response = await withProviderAuth(request(app).post("/admin/debts/import")).send({
     filename: "deudas-invalidas.csv",
     csvContent: [
       "tenantId,serviceId,customerRef,period,amount,dueDate,status",
-      "tenant-1,agua,123456,2026-06,no-numero,2026-06-20T00:00:00.000Z,PENDING",
+      "1,agua,123456,2026-06,no-numero,2026-06-20T00:00:00.000Z,PENDING",
     ].join("\n"),
   });
 
@@ -694,7 +727,7 @@ test("POST /admin/debts/import returns 400 for an invalid row and stores the fai
 test("POST /admin/debts/import stores zero imported records when validation fails after valid rows", async () => {
   let importCreateQuery = null;
 
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async () => [],
@@ -719,12 +752,12 @@ test("POST /admin/debts/import stores zero imported records when validation fail
     },
   });
 
-  const response = await request(app).post("/admin/debts/import").send({
+  const response = await withProviderAuth(request(app).post("/admin/debts/import")).send({
     filename: "deudas-invalidas.csv",
     csvContent: [
       "tenantId,serviceId,customerRef,period,amount,dueDate,status",
-      "tenant-1,agua,123456,2026-06,99.5,2026-06-20T00:00:00.000Z,PENDING",
-      "tenant-2,internet,ABC123,2026-07,no-numero,2026-07-10T00:00:00.000Z,PAID",
+      "1,agua,123456,2026-06,99.5,2026-06-20T00:00:00.000Z,PENDING",
+      "2,internet,ABC123,2026-07,no-numero,2026-07-10T00:00:00.000Z,PAID",
     ].join("\n"),
   });
 
@@ -743,19 +776,19 @@ test("POST /admin/debts/import stores zero imported records when validation fail
 test("POST /admin/debts/import rejects rows with unknown or inactive providers", async () => {
   for (const scenario of [
     {
-      tenantId: "tenant-404",
-      activeProviders: [{ id: 1, tenant_id: "tenant-1", active: true }],
+      companyId: "404",
+      activeProviders: [{ id: 1, tenant_id: "1", active: true }],
     },
     {
-      tenantId: "tenant-2",
-      activeProviders: [{ id: 1, tenant_id: "tenant-1", active: true }],
+      companyId: "2",
+      activeProviders: [{ id: 1, tenant_id: "1", active: true }],
     },
   ]) {
     let createManyWasCalled = false;
     let importCreateQuery = null;
     let providerQuery = null;
 
-    const app = createApp({
+    const app = createAdminApp({
       prismaClient: {
         provider: {
           findMany: async (query) => {
@@ -784,22 +817,22 @@ test("POST /admin/debts/import rejects rows with unknown or inactive providers",
       },
     });
 
-    const response = await request(app).post("/admin/debts/import").send({
+    const response = await withProviderAuth(request(app).post("/admin/debts/import"), scenario.companyId).send({
       filename: "deudas-invalidas.csv",
       csvContent: [
         "tenantId,serviceId,customerRef,period,amount,dueDate,status",
-        "tenant-1,agua,123456,2026-06,99.5,2026-06-20T00:00:00.000Z,PENDING",
-        `${scenario.tenantId},internet,ABC123,2026-07,150,2026-07-10T00:00:00.000Z,PAID`,
+        "1,agua,123456,2026-06,99.5,2026-06-20T00:00:00.000Z,PENDING",
+        `${scenario.companyId},internet,ABC123,2026-07,150,2026-07-10T00:00:00.000Z,PAID`,
       ].join("\n"),
     });
 
     assert.equal(response.status, 400);
     assert.equal(response.body.success, false);
-    assert.match(response.body.message, /fila 3|proveedor activo/i);
+    assert.match(response.body.message, /fila 2|proveedor activo/i);
     assert.deepEqual(providerQuery, {
       where: {
         active: true,
-        tenant_id: { in: ["tenant-1", scenario.tenantId] },
+        tenant_id: { in: [scenario.companyId] },
       },
     });
     assert.equal(createManyWasCalled, false);
@@ -817,17 +850,17 @@ test("POST /admin/debts/import rolls back created debts when the import summary 
   let committedDebts = [];
   let transactionWasUsed = false;
 
-  const app = createApp({
+  const app = createAdminApp({
     prismaClient: {
       provider: {
         findMany: async (query) => {
           assert.deepEqual(query, {
             where: {
               active: true,
-              tenant_id: { in: ["tenant-1"] },
+               tenant_id: { in: ["1"] },
             },
           });
-          return [{ id: 1, tenant_id: "tenant-1", active: true }];
+           return [{ id: 1, tenant_id: "1", active: true }];
         },
         findUnique: async () => null,
       },
@@ -870,11 +903,11 @@ test("POST /admin/debts/import rolls back created debts when the import summary 
     },
   });
 
-  const response = await request(app).post("/admin/debts/import").send({
+  const response = await withProviderAuth(request(app).post("/admin/debts/import")).send({
     filename: "deudas-junio.csv",
     csvContent: [
       "tenantId,serviceId,customerRef,period,amount,dueDate,status",
-      "tenant-1,agua,123456,2026-06,99.5,2026-06-20T00:00:00.000Z,PENDING",
+      "1,agua,123456,2026-06,99.5,2026-06-20T00:00:00.000Z,PENDING",
     ].join("\n"),
   });
 

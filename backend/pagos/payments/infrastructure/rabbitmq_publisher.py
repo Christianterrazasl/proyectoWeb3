@@ -9,8 +9,8 @@ class RabbitMQPublisher:
     """
 
     def __init__(self):
-        # En desarrollo usaremos localhost, pero lo leemos del .env para cuando usemos Docker
-        self.host = os.getenv('RABBITMQ_HOST', 'localhost')
+        # Usamos el alias del servicio en red interna y permitimos override por entorno.
+        self.host = os.getenv('RABBITMQ_HOST', 'rabbitmq')
 
     def publish_payment_completed(self, transaction):
         try:

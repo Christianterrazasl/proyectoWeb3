@@ -17,7 +17,7 @@ const {
 } = require("./src/application/services/debt-payload");
 const { parseDebtImportCsv } = require("./src/application/services/debt-import");
 
-function createApp({ prismaClient }) {
+function createApp({ prismaClient, adminDebtRoutesOptions = {} }) {
   const app = express();
 
   app.use(cors());
@@ -25,7 +25,8 @@ function createApp({ prismaClient }) {
 
   registerHealthRoutes(app);
   registerPublicDebtRoutes(app, { prismaClient });
-  registerAdminDebtRoutes(app, { prismaClient });
+  // Permite inyectar middleware alternativo en tests sin duplicar el wiring real.
+  registerAdminDebtRoutes(app, { prismaClient, ...adminDebtRoutesOptions });
 
   return app;
 }

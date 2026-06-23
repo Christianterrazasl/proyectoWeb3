@@ -7,6 +7,12 @@ export class GetServiceByIdQuery extends QueryHandler {
   }
 
   async execute(id) {
-    return await this.serviceRepository.findByIdForRead(id);
+    const resolvedId = id !== null && typeof id === "object" ? (id.serviceId ?? id.id) : id;
+
+    if (typeof this.serviceRepository.findByIdForRead === "function") {
+      return await this.serviceRepository.findByIdForRead(resolvedId);
+    }
+
+    return await this.serviceRepository.findById(resolvedId);
   }
 }

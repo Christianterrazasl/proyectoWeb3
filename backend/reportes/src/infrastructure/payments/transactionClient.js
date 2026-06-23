@@ -1,6 +1,8 @@
 const DEFAULT_PAYMENTS_ADMIN_TRANSACTIONS_URL =
   process.env.PAYMENTS_ADMIN_TRANSACTIONS_URL ||
-  "http://pagos:3000/api/payments/admin/transactions";
+  // Reportes consume el endpoint canónico de pagos y deja el alias admin solo
+  // para compatibilidad si otro caller lo necesita por configuración.
+  "http://pagos:3000/api/payments";
 
 function appendOptionalParam(searchParams, key, value) {
   // Evita enviar filtros vacíos para que `pagos` conserve sus defaults naturales.

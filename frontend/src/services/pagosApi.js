@@ -8,11 +8,18 @@ async function parseJsonResponse(response) {
   return null;
 }
 
-export async function createPaymentQr({ tenant_id, service_id, customer_ref, amount }) {
+export async function createPaymentQr({
+  debt_id,
+  tenant_id,
+  service_id,
+  customer_ref,
+  amount,
+}) {
   const response = await fetch(`${PAYMENTS_API_BASE}/qr`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      debt_id,
       tenant_id,
       service_id,
       customer_ref,

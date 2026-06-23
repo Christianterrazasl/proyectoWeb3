@@ -11,6 +11,7 @@ class TransactionRepositoryImpl:
             orm_model = TransactionModel.objects.get(id=transaction_id)
             return Transaction(
                 entity_id=orm_model.id,
+                debt_id=orm_model.debt_id,
                 tenant_id=orm_model.tenant_id,
                 service_id=orm_model.service_id,
                 customer_ref=orm_model.customer_ref,
@@ -27,6 +28,7 @@ class TransactionRepositoryImpl:
             id=transaction.id,
             defaults={
                 'tenant_id': transaction.tenant_id,
+                'debt_id': transaction.debt_id,
                 'service_id': transaction.service_id,
                 'customer_ref': transaction.customer_ref,
                 'amount': transaction.amount,
@@ -40,6 +42,7 @@ class TransactionRepositoryImpl:
             {'id': transaction.id},
             {'$set': {
                 'id': transaction.id,
+                'debt_id': transaction.debt_id,
                 'tenant_id': transaction.tenant_id,
                 'service_id': transaction.service_id,
                 'customer_ref': transaction.customer_ref,

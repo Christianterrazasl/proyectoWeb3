@@ -13,7 +13,7 @@ export default function App() {
       <Route path="/deuda/:idProveedor" element={<DeudasPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/proveedor" element={
-        <ProtectedRoute blockAdmin>
+        <ProtectedRoute requireProvider>
           <ProveedorPage />
         </ProtectedRoute>
       } />

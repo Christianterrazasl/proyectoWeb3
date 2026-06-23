@@ -1,8 +1,8 @@
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { getDefaultRouteForUser, isAdminRole } from "../utils/roleRouting";
+import { useAuth } from "../context/useAuth";
+import { getDefaultRouteForUser, isAdminRole, isProviderRole } from "../utils/roleRouting";
 
-const ProtectedRoute = ({ children, requireAdmin = false, blockAdmin = false }) => {
+const ProtectedRoute = ({ children, requireAdmin = false, requireProvider = false, blockAdmin = false }) => {
   const { isAuthenticated, isBootstrapping, user } = useAuth();
 
   // El guard espera el bootstrap porque la sesión válida depende de reconstruir /me, no solo de leer tokens.
@@ -23,8 +23,13 @@ const ProtectedRoute = ({ children, requireAdmin = false, blockAdmin = false }) 
 
   // El guard solo decide acceso; la resolución de rol vive en la utilidad compartida.
   const userIsAdmin = isAdminRole(user);
+  const userIsProvider = isProviderRole(user);
 
   if (requireAdmin && !userIsAdmin) {
+    return <Navigate to={getDefaultRouteForUser(user)} replace />;
+  }
+
+  if (requireProvider && !userIsProvider) {
     return <Navigate to={getDefaultRouteForUser(user)} replace />;
   }
 

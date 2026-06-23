@@ -42,13 +42,33 @@ app.use(
 app.use(
   "/api/admin/debts",
   proxy("http://deudas:3000", {
-    "^/api/admin/debts": "/admin/debts",
+    "^/": "/admin/debts/",
   })
 );
-app.use("/api/admin/reports", proxy("http://reportes:3000"));
-app.use("/api/admin/dashboard", proxy("http://reportes:3000"));
-app.use("/api/admin/exports", proxy("http://reportes:3000"));
-app.use("/api/admin/audit-logs", proxy("http://reportes:3000"));
+app.use(
+  "/api/admin/reports",
+  proxy("http://reportes:3000", {
+    "^/": "/api/admin/reports/",
+  }),
+);
+app.use(
+  "/api/admin/dashboard",
+  proxy("http://reportes:3000", {
+    "^/": "/api/admin/dashboard/",
+  }),
+);
+app.use(
+  "/api/admin/exports",
+  proxy("http://reportes:3000", {
+    "^/": "/api/admin/exports/",
+  }),
+);
+app.use(
+  "/api/admin/audit-logs",
+  proxy("http://reportes:3000", {
+    "^/": "/api/admin/audit-logs/",
+  }),
+);
 app.use("/api/admin", proxy("http://catalogo:3000"));
 app.use("/api/catalog", proxy("http://catalogo:3000"));
 app.use(

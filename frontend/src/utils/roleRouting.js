@@ -16,7 +16,20 @@ export function isAdminRole(source) {
   return role === "admin";
 }
 
+export function isProviderRole(source) {
+  const role = getUserGlobalRole(source);
+  return role === "provider";
+}
+
 export function getDefaultRouteForUser(source) {
   // Una sola fuente de verdad evita que login y guards diverjan al redirigir.
-  return isAdminRole(source) ? "/admin" : "/proveedor";
+  if (isAdminRole(source)) {
+    return "/admin";
+  }
+
+  if (isProviderRole(source)) {
+    return "/proveedor";
+  }
+
+  return "/";
 }

@@ -1,5 +1,5 @@
-import { AUTH_API_ROUTES } from "../config/authApiRoutes";
-import { getStoredActiveCompanyId } from "../utils/authStorage";
+import { AUTH_API_ROUTES } from "../config/authApiRoutes.js";
+import { getStoredActiveCompanyId } from "../utils/authStorage.js";
 
 async function parseJsonResponse(response) {
   const contentType = response.headers.get("content-type");

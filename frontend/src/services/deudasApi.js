@@ -1,5 +1,5 @@
-const DEUDAS_API_BASE = import.meta.env.VITE_DEUDAS_API_URL || "/debts";
-const ADMIN_DEBTS_BASE = import.meta.env.VITE_ADMIN_DEBTS_API_URL || "/api/admin/debts";
+const DEUDAS_API_BASE = import.meta.env?.VITE_DEUDAS_API_URL || "/debts";
+const ADMIN_DEBTS_BASE = import.meta.env?.VITE_ADMIN_DEBTS_API_URL || "/api/admin/debts";
 
 async function parseJsonResponse(response) {
   const contentType = response.headers.get("content-type") || "";
@@ -9,6 +9,17 @@ async function parseJsonResponse(response) {
   }
 
   return null;
+}
+
+function getAdminDebtsUrl(status) {
+  const origin = globalThis.window?.location?.origin || "http://localhost";
+  const url = new URL(ADMIN_DEBTS_BASE, origin);
+
+  if (status) {
+    url.searchParams.set("status", status);
+  }
+
+  return url.pathname + url.search;
 }
 
 export async function searchProvidersByDocument(customerRef) {
@@ -75,12 +86,7 @@ function authHeaders(accessToken, companyId) {
 }
 
 export async function listProviderDebts({ accessToken, companyId, status }) {
-  const url = new URL(ADMIN_DEBTS_BASE, window.location.origin);
-  if (status) {
-    url.searchParams.set("status", status);
-  }
-
-  const response = await fetch(url.pathname + url.search, {
+  const response = await fetch(getAdminDebtsUrl(status), {
     headers: authHeaders(accessToken, companyId),
   });
 
@@ -92,6 +98,8 @@ export async function listProviderDebts({ accessToken, companyId, status }) {
 
   return data?.data ?? [];
 }
+
+export { getAdminDebtsUrl };
 
 export async function createProviderDebt({
   accessToken,

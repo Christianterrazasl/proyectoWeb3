@@ -7,6 +7,10 @@ export class GetCatalogQuery extends QueryHandler {
   }
 
   async execute() {
-    return await this.serviceRepository.findAllActiveForRead();
+    if (typeof this.serviceRepository.findAllActiveForRead === "function") {
+      return await this.serviceRepository.findAllActiveForRead();
+    }
+
+    return await this.serviceRepository.findAll();
   }
 }

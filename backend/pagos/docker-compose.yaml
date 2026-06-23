@@ -13,5 +13,7 @@ services:
     network_mode: "host" # Permite a Django leer tu localhost para Postgres y Mongo nativos
     depends_on:
       - rabbitmq
+    environment:
+      RABBITMQ_HOST: localhost
     env_file:
       - .env # Le pasamos tus variables de entorno automáticamente

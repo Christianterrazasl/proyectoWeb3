@@ -17,8 +17,11 @@ const {
 
 const { requireProviderSession } = require("../middleware/requireProviderSession");
 
-function registerAdminDebtRoutes(app, { prismaClient }) {
-  const withProvider = (handler) => [requireProviderSession, handler];
+function registerAdminDebtRoutes(app, {
+  prismaClient,
+  requireProviderSessionMiddleware = requireProviderSession,
+}) {
+  const withProvider = (handler) => [requireProviderSessionMiddleware, handler];
 
   app.get("/admin/debts", ...withProvider(async (req, res) => {
     const status = normalizeInput(req.query?.status).toUpperCase() || undefined;

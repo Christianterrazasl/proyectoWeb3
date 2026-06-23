@@ -1,22 +1,25 @@
 import {
-  FiActivity,
   FiArrowUpRight,
-  FiBell,
   FiBriefcase,
   FiCreditCard,
   FiGrid,
   FiHome,
   FiLogOut,
   FiRefreshCw,
-  FiSearch,
   FiShield,
   FiTrendingUp,
   FiUsers,
 } from "react-icons/fi";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { getDashboardSummary } from "../services/reportesApi";
+import { useAuth } from "../context/useAuth";
+import {
+  getAuditLogs,
+  getCompanyPortfolioSummary,
+  getDashboardSummary,
+  getServiceKpis,
+  getTransactionMonitoring,
+} from "../services/reportesApi";
 import { getAccessToken } from "../utils/authStorage";
 import {
   buildTenancyCompanies,
@@ -29,33 +32,33 @@ const sidebarItems = [
   { label: "Empresas", icon: FiHome },
   { label: "Operaciones", icon: FiCreditCard },
   { label: "Riesgo", icon: FiShield },
-  { label: "Actividad", icon: FiActivity },
+  { label: "Actividad", icon: FiUsers },
 ];
 
 const defaultKpiCards = [
   {
-    label: "Volumen procesado",
-    value: "Bs. 1.28M",
-    detail: "+14.8% vs. semana previa",
+    label: "Monto pendiente",
+    value: "Bs. 0.00",
+    detail: "0 deudas pendientes",
     icon: FiTrendingUp,
   },
   {
     label: "Empresas activas",
-    value: "18",
-    detail: "3 nuevas este mes",
+    value: "0",
+    detail: "0 empresas en scope",
     icon: FiHome,
   },
   {
-    label: "Operaciones hoy",
-    value: "2,416",
-    detail: "98.7% conciliadas",
+    label: "Transacciones",
+    value: "0",
+    detail: "0% aprobadas",
     icon: FiCreditCard,
   },
   {
-    label: "Alertas abiertas",
-    value: "05",
-    detail: "2 requieren revisión inmediata",
-    icon: FiBell,
+    label: "Deudas en cartera",
+    value: "0",
+    detail: "0 transacciones fallidas",
+    icon: FiArrowUpRight,
   },
 ];
 
@@ -85,86 +88,55 @@ function buildKpiCardsFromDashboard(summary) {
       label: "Deudas en cartera",
       value: String(summary.total_debts ?? 0),
       detail: `${summary.failed_transactions ?? 0} transacciones fallidas`,
-      icon: FiBell,
+      icon: FiArrowUpRight,
     },
   ];
 }
 
-const companies = [
-  {
-    name: "EnerBol Distribución",
-    segment: "Servicios básicos",
-    status: "Operando",
-    transactions: "842 hoy",
-    collection: "Bs. 312k",
-  },
-  {
-    name: "AquaRed Metropolitana",
-    segment: "Agua y saneamiento",
-    status: "Monitoreo",
-    transactions: "516 hoy",
-    collection: "Bs. 188k",
-  },
-  {
-    name: "NetSur Telecom",
-    segment: "Telecomunicaciones",
-    status: "Operando",
-    transactions: "603 hoy",
-    collection: "Bs. 241k",
-  },
-  {
-    name: "Municipio Central",
-    segment: "Recaudación pública",
-    status: "Pendiente corte",
-    transactions: "455 hoy",
-    collection: "Bs. 95k",
-  },
-];
+function formatAmount(value) {
+  return `Bs. ${Number(value || 0).toFixed(2)}`;
+}
 
-const activityFeed = [
-  {
-    title: "Pico transaccional detectado",
-    detail: "EnerBol aumentó 22% su volumen en los últimos 15 minutos.",
-    time: "Hace 4 min",
-    tone: "info",
-  },
-  {
-    title: "Conciliación manual requerida",
-    detail:
-      "2 operaciones de AquaRed quedaron en revisión por timeout bancario.",
-    time: "Hace 11 min",
-    tone: "warning",
-  },
-  {
-    title: "Nueva empresa habilitada",
-    detail:
-      "SaludVital quedó visible para pruebas internas del equipo operativo.",
-    time: "Hace 25 min",
-    tone: "success",
-  },
-  {
-    title: "Feed de QR estable",
-    detail: "Sin incidentes críticos reportados durante la última hora.",
-    time: "Hace 39 min",
-    tone: "neutral",
-  },
-];
+function formatDateTime(value) {
+  if (!value) return "Sin fecha";
 
-const chartBars = [38, 52, 47, 65, 71, 58, 82];
+  const date = new Date(value);
 
-function SidebarItem({ label, icon: Icon, active = false }) {
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("es-BO");
+}
+
+function formatStatus(status) {
+  const normalized = String(status || "").toUpperCase();
+
+  if (normalized === "PENDING") return "Pendiente";
+  if (normalized === "PAID" || normalized === "SUCCESS") return "OK";
+  if (normalized === "FAILED") return "Fallida";
+  if (normalized === "CANCELLED") return "Cancelada";
+
+  return normalized || "Sin estado";
+}
+
+function SidebarItem({ label, icon, active = false }) {
+  const IconComponent = icon;
+
   return (
     <button
       type="button"
       className={`lumina-sidebar-link ${active ? "is-active" : ""}`}
     >
-      <Icon className="text-base" />
+      <IconComponent className="text-base" />
       <span>{label}</span>
     </button>
   );
 }
 
-function KpiCard({ label, value, detail, icon: Icon }) {
+function KpiCard({ label, value, detail, icon }) {
+  const IconComponent = icon;
+
   return (
     <article className="lumina-kpi-card">
       <div className="flex items-start justify-between gap-4">
@@ -173,7 +145,7 @@ function KpiCard({ label, value, detail, icon: Icon }) {
           <p className="mt-3 text-3xl font-semibold text-slate-100">{value}</p>
         </div>
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/15 bg-cyan-300/8 text-cyan-200">
-          <Icon />
+          <IconComponent />
         </div>
       </div>
       <p className="mt-4 text-sm text-slate-400">{detail}</p>
@@ -184,6 +156,10 @@ function KpiCard({ label, value, detail, icon: Icon }) {
 const AdminPage = () => {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
+  const [portfolioRows, setPortfolioRows] = useState([]);
+  const [serviceRows, setServiceRows] = useState([]);
+  const [transactionRows, setTransactionRows] = useState([]);
+  const [auditRows, setAuditRows] = useState([]);
   const [dashboardError, setDashboardError] = useState("");
 
   const {
@@ -192,7 +168,6 @@ const AdminPage = () => {
     memberships,
     accessibleCompanies,
     activeCompanyId,
-    setActiveCompany,
   } = useAuth();
 
   useEffect(() => {
@@ -203,13 +178,29 @@ const AdminPage = () => {
 
     const loadDashboard = async () => {
       try {
-        const summary = await getDashboardSummary(token);
+        const [summary, portfolio, services, transactions, auditLogs] = await Promise.all([
+          getDashboardSummary(token, activeCompanyId),
+          getCompanyPortfolioSummary(token, activeCompanyId),
+          getServiceKpis(token, activeCompanyId),
+          getTransactionMonitoring(token, activeCompanyId),
+          getAuditLogs(token, activeCompanyId),
+        ]);
+
         if (!ignore) {
           setDashboard(summary);
+          setPortfolioRows(Array.isArray(portfolio) ? portfolio : []);
+          setServiceRows(Array.isArray(services) ? services : []);
+          setTransactionRows(Array.isArray(transactions) ? transactions : []);
+          setAuditRows(Array.isArray(auditLogs) ? auditLogs : []);
           setDashboardError("");
         }
       } catch (error) {
         if (!ignore) {
+          setDashboard(null);
+          setPortfolioRows([]);
+          setServiceRows([]);
+          setTransactionRows([]);
+          setAuditRows([]);
           setDashboardError(error.message || "No se pudo cargar el dashboard");
         }
       }
@@ -220,7 +211,7 @@ const AdminPage = () => {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [activeCompanyId]);
 
   const kpiCards = useMemo(
     () => buildKpiCardsFromDashboard(dashboard),
@@ -233,10 +224,6 @@ const AdminPage = () => {
   );
 
   const activeCompany = getActiveCompany(tenancyCompanies, activeCompanyId);
-
-  const handleActiveCompanyChange = (event) => {
-    setActiveCompany(Number(event.target.value));
-  };
 
   const handleLogout = () => {
     logout();
@@ -300,8 +287,8 @@ const AdminPage = () => {
           <div className="rounded-[24px] border border-cyan-300/12 bg-cyan-300/[0.04] p-4">
             <p className="lumina-label text-cyan-300">Estado del entorno</p>
             <p className="mt-3 text-sm text-slate-300">
-              Auth y tenancy YA vienen de la API real. Los KPIs y métricas de
-              operación siguen mock hasta conectar reportes y pagos.
+              Auth, tenancy y reportes administrativos ya están saliendo de los
+              microservicios reales del entorno.
             </p>
           </div>
         </aside>
@@ -315,14 +302,13 @@ const AdminPage = () => {
                   Control centralizado para empresas, riesgo y operación diaria.
                 </h1>
                 <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-300 sm:text-base">
-                  Este panel mezcla tenancy REAL desde auth con bloques mock de
-                  operación mientras el backend administrativo termina de
-                  madurar.
+                  Este panel usa tenancy desde auth y reportes reales para
+                  cartera, servicios, transacciones y auditoría.
                 </p>
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button type="button" className="lumina-button-secondary">
+                <button type="button" className="lumina-button-secondary" onClick={() => window.location.reload()}>
                   <FiRefreshCw />
                   Actualizar vista
                 </button>
@@ -339,20 +325,20 @@ const AdminPage = () => {
 
             <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="lumina-inline-stat">
-                <FiUsers className="text-cyan-300" />4 equipos monitoreando la
-                plataforma
+                <FiUsers className="text-cyan-300" />
+                {dashboard?.total_companies ?? 0} empresa(s) visibles
               </div>
               <div className="lumina-inline-stat">
                 <FiBriefcase className="text-cyan-300" />
-                Ventana de corte: 23:30 BOT
+                {dashboard?.total_services ?? 0} servicio(s) en catálogo
               </div>
               <div className="lumina-inline-stat">
                 <FiShield className="text-cyan-300" />
-                Riesgo operativo: controlado
+                {dashboard?.pending_debts ?? 0} deuda(s) pendientes
               </div>
               <div className="lumina-inline-stat">
                 <FiArrowUpRight className="text-cyan-300" />
-                SLA visual: 99.94%
+                {dashboard?.approval_rate ?? 0}% de aprobación
               </div>
             </div>
           </section>
@@ -399,9 +385,8 @@ const AdminPage = () => {
               </div>
 
               <p className="mt-4 text-sm leading-6 text-slate-400">
-                Este bloque YA usa tenancy real. El resto del dashboard sigue
-                mock porque auth no expone KPI, riesgo, recaudación ni actividad
-                operativa.
+                El alcance de empresa activa también filtra los reportes cuando
+                el backend recibe `X-Company-Id`.
               </p>
             </article>
 
@@ -472,7 +457,7 @@ const AdminPage = () => {
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {dashboardError && (
               <div className="md:col-span-2 xl:col-span-4 rounded-[24px] border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-100">
-                {dashboardError} — mostrando valores de respaldo.
+                 {dashboardError} — algunos bloques quedaron vacíos hasta el próximo refresh.
               </div>
             )}
             {kpiCards.map((card) => (
@@ -485,68 +470,61 @@ const AdminPage = () => {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <p className="lumina-label text-cyan-300">
-                    Directorio de empresas
+                    Cartera por empresa
                   </p>
                   <h2 className="lumina-title mt-3 text-slate-100">
-                    Tenants priorizados para seguimiento
+                    Resumen real del portafolio administrativo
                   </h2>
-                </div>
-
-                <div className="relative w-full lg:max-w-xs">
-                  <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    className="lumina-input pl-11"
-                    value=""
-                    readOnly
-                    placeholder="Filtrar por empresa (mock)"
-                  />
                 </div>
               </div>
 
               <div className="mt-6 overflow-hidden rounded-[24px] border border-white/8 bg-slate-950/45">
                 <div className="hidden grid-cols-[1.4fr_1fr_0.9fr_0.9fr_0.9fr] gap-4 border-b border-white/8 px-5 py-4 text-[11px] uppercase tracking-[0.18em] text-slate-500 md:grid">
                   <span>Empresa</span>
-                  <span>Vertical</span>
-                  <span>Estado</span>
-                  <span>Operaciones</span>
-                  <span>Recaudación</span>
+                  <span>Estado tenant</span>
+                  <span>Disponibilidad</span>
+                  <span>Deudas</span>
+                  <span>Monto pendiente</span>
                 </div>
 
                 <div>
-                  {companies.map((company) => (
-                    <div key={company.name} className="lumina-table-row">
+                  {portfolioRows.map((company) => (
+                    <div key={company.company_id} className="lumina-table-row">
                       <div>
                         <p className="font-medium text-slate-100">
-                          {company.name}
+                          {company.company_name}
                         </p>
                         <p className="mt-1 text-sm text-slate-400 md:hidden">
-                          {company.segment}
+                          {formatAmount(company.pending_amount)} pendientes
                         </p>
                       </div>
                       <p className="hidden text-sm text-slate-300 md:block">
-                        {company.segment}
+                        {getCompanyStatusLabel(company.company_status)}
                       </p>
                       <div>
                         <span
                           className={`lumina-status-pill ${
-                            company.status === "Pendiente corte"
+                            company.company_active === false
                               ? "is-warning"
-                              : company.status === "Monitoreo"
-                                ? "is-neutral"
-                                : "is-success"
+                              : "is-success"
                           }`}
                         >
-                          {company.status}
+                          {company.company_active ? "Activa" : "Inactiva"}
                         </span>
                       </div>
                       <p className="text-sm text-slate-300">
-                        {company.transactions}
+                        {company.pending_debts}/{company.total_debts}
                       </p>
                       <p className="text-sm font-medium text-slate-100">
-                        {company.collection}
+                        {formatAmount(company.pending_amount)}
                       </p>
                     </div>
                   ))}
+                  {portfolioRows.length === 0 && (
+                    <div className="px-5 py-6 text-sm text-slate-400">
+                      No hay filas de cartera para el alcance actual.
+                    </div>
+                  )}
                 </div>
               </div>
             </article>
@@ -556,75 +534,105 @@ const AdminPage = () => {
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="lumina-label text-cyan-300">
-                      Analítica rápida
+                      Servicios priorizados
                     </p>
                     <h2 className="lumina-title mt-3 text-slate-100">
-                      Tendencia semanal
+                      Mayor cartera pendiente
                     </h2>
                   </div>
-                  <span className="lumina-trust-badge">Mock data</span>
+                  <span className="lumina-trust-badge">Reportes reales</span>
                 </div>
 
-                <div className="mt-8 flex h-56 items-end gap-3">
-                  {chartBars.map((value, index) => (
-                    <div
-                      key={`${value}-${index}`}
-                      className="flex flex-1 flex-col items-center gap-3"
-                    >
-                      <div
-                        className="w-full rounded-t-2xl bg-gradient-to-t from-cyan-400/30 via-cyan-300/55 to-indigo-400/70 shadow-[0_0_22px_rgba(34,211,238,0.16)]"
-                        style={{ height: `${value * 1.8}px` }}
-                      />
-                      <span className="text-xs text-slate-500">
-                        D{index + 1}
-                      </span>
-                    </div>
-                  ))}
+                <div className="mt-6 space-y-4">
+                  {serviceRows
+                    .slice()
+                    .sort((left, right) => Number(right.pending_amount || 0) - Number(left.pending_amount || 0))
+                    .slice(0, 5)
+                    .map((service) => (
+                      <div key={`${service.company_id}-${service.service_id}`} className="lumina-activity-item">
+                        <div className="lumina-activity-dot is-info" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="font-medium text-slate-100">
+                              {service.service_name || service.service_id}
+                            </p>
+                            <span className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                              {formatAmount(service.pending_amount)}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-slate-400">
+                            {service.company_name || `Empresa ${service.company_id}`} · {service.pending_debts} pendiente(s) de {service.total_debts} deuda(s)
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  {serviceRows.length === 0 && (
+                    <p className="mt-5 text-sm leading-6 text-slate-400">
+                      No hay KPIs de servicios para mostrar en este alcance.
+                    </p>
+                  )}
                 </div>
-
-                <p className="mt-5 text-sm leading-6 text-slate-400">
-                  Visual simple para reservar espacio a la analítica real.
-                  Cuando exista el backend, este bloque puede migrar a métricas
-                  consolidadas sin rehacer la estructura.
-                </p>
               </article>
 
               <article className="lumina-shell">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="lumina-label text-cyan-300">
-                      Actividad en vivo
+                      Operación reciente
                     </p>
                     <h2 className="lumina-title mt-3 text-slate-100">
-                      Operaciones recientes
+                      Transacciones y auditoría
                     </h2>
                   </div>
                   <span className="text-xs uppercase tracking-[0.18em] text-emerald-300">
-                    Live mock
+                    Backend real
                   </span>
                 </div>
 
                 <div className="mt-6 space-y-4">
-                  {activityFeed.map((item) => (
-                    <div key={item.title} className="lumina-activity-item">
+                  {transactionRows.slice(0, 3).map((item) => (
+                    <div key={item.transaction_id} className="lumina-activity-item">
                       <div
-                        className={`lumina-activity-dot ${`is-${item.tone}`}`}
+                        className={`lumina-activity-dot ${item.status === "FAILED" ? "is-warning" : "is-success"}`}
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <p className="font-medium text-slate-100">
-                            {item.title}
+                            {item.service_name || item.service_id || item.transaction_id}
                           </p>
                           <span className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                            {item.time}
+                            {formatDateTime(item.created_at)}
                           </span>
                         </div>
                         <p className="mt-2 text-sm leading-6 text-slate-400">
-                          {item.detail}
+                          {item.company_name || `Empresa ${item.company_id}`} · {formatStatus(item.status)} · {formatAmount(item.amount)}
                         </p>
                       </div>
                     </div>
                   ))}
+                  {auditRows.slice(0, 2).map((item) => (
+                    <div key={`audit-${item.id}-${item.created_at}`} className="lumina-activity-item">
+                      <div className="lumina-activity-dot is-neutral" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="font-medium text-slate-100">
+                            {item.action || "Actividad administrativa"}
+                          </p>
+                          <span className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                            {formatDateTime(item.created_at)}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                          {(item.actor_email || "Sistema")} · {item.resource_type || "reporte"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {transactionRows.length === 0 && auditRows.length === 0 && (
+                    <p className="text-sm leading-6 text-slate-400">
+                      No hay actividad reciente para el alcance actual.
+                    </p>
+                  )}
                 </div>
               </article>
             </div>

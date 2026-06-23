@@ -14,57 +14,66 @@ function parseCompanyId(rawCompanyId) {
   return { ok: true, value: companyId };
 }
 
-async function requireProviderSession(req, res, next) {
-  const authorization = req.header("authorization");
-  const rawCompanyId = req.header("x-company-id");
+function createRequireProviderSession({
+  fetchCurrentSession: fetchCurrentSessionDependency = fetchCurrentSession,
+} = {}) {
+  // Factory para poder stubear la validación remota en tests sin tocar Express.
+  return async function requireProviderSession(req, res, next) {
+    const authorization = req.header("authorization");
+    const rawCompanyId = req.header("x-company-id");
 
-  if (!authorization || !authorization.startsWith("Bearer ")) {
-    return res.status(401).json({
-      success: false,
-      message: "Se requiere un token Bearer válido.",
+    if (!authorization || !authorization.startsWith("Bearer ")) {
+      return res.status(401).json({
+        success: false,
+        message: "Se requiere un token Bearer válido.",
+      });
+    }
+
+    const parsedCompanyId = parseCompanyId(rawCompanyId);
+
+    if (!parsedCompanyId.ok) {
+      return res.status(400).json({
+        success: false,
+        message: parsedCompanyId.required
+          ? "El header X-Company-Id es obligatorio para operaciones de proveedor."
+          : "El header X-Company-Id debe ser un entero válido.",
+      });
+    }
+
+    const sessionResult = await fetchCurrentSessionDependency({
+      authorization,
+      companyId: parsedCompanyId.value,
     });
-  }
 
-  const parsedCompanyId = parseCompanyId(rawCompanyId);
+    if (!sessionResult.ok) {
+      return res.status(sessionResult.status).json({
+        success: false,
+        message:
+          sessionResult.body?.detail ||
+          "No se pudo validar la sesión contra auth.",
+      });
+    }
 
-  if (!parsedCompanyId.ok) {
-    return res.status(400).json({
-      success: false,
-      message: parsedCompanyId.required
-        ? "El header X-Company-Id es obligatorio para operaciones de proveedor."
-        : "El header X-Company-Id debe ser un entero válido.",
-    });
-  }
+    const session = sessionResult.body;
+    const globalRole = session?.user?.global_role;
 
-  const sessionResult = await fetchCurrentSession({
-    authorization,
-    companyId: parsedCompanyId.value,
-  });
+    if (!["provider", "admin"].includes(globalRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Solo proveedores o administradores pueden acceder a este endpoint.",
+      });
+    }
 
-  if (!sessionResult.ok) {
-    return res.status(sessionResult.status).json({
-      success: false,
-      message:
-        sessionResult.body?.detail ||
-        "No se pudo validar la sesión contra auth.",
-    });
-  }
+    req.authContext = session;
+    // Normalizamos ambos nombres porque el resto del servicio mezcla `company`
+    // y `tenant` para referirse al alcance del proveedor autenticado.
+    req.companyId = parsedCompanyId.value;
+    req.tenantId = String(parsedCompanyId.value);
 
-  const session = sessionResult.body;
-  const globalRole = session?.user?.global_role;
-
-  if (!["provider", "admin"].includes(globalRole)) {
-    return res.status(403).json({
-      success: false,
-      message: "Solo proveedores o administradores pueden acceder a este endpoint.",
-    });
-  }
-
-  req.authContext = session;
-  req.companyId = parsedCompanyId.value;
-  req.tenantId = String(parsedCompanyId.value);
-
-  return next();
+    return next();
+  };
 }
 
-module.exports = { requireProviderSession };
+const requireProviderSession = createRequireProviderSession();
+
+module.exports = { createRequireProviderSession, requireProviderSession };

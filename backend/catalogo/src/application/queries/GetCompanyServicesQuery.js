@@ -7,7 +7,12 @@ export class GetCompanyServicesQuery extends QueryHandler {
   }
 
   async execute(companyId) {
-    const services = await this.serviceRepository.findByCompanyId(companyId);
+    const resolvedCompanyId =
+      companyId !== null && typeof companyId === "object"
+        ? companyId.companyId
+        : companyId;
+
+    const services = await this.serviceRepository.findByCompanyId(resolvedCompanyId);
     return services;
   }
 }

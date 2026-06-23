@@ -6,6 +6,7 @@ class TransactionModel(models.Model):
     Esta es la fuente de la verdad absoluta que se guardará en PostgreSQL.
     """
     id = models.CharField(max_length=50, primary_key=True)
+    debt_id = models.IntegerField(null=True, blank=True)
     tenant_id = models.CharField(max_length=50)
     service_id = models.CharField(max_length=50)
     customer_ref = models.CharField(max_length=150)

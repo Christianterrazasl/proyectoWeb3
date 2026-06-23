@@ -13,9 +13,10 @@ class TransactionStatus(str, Enum):
 
 
 class Transaction(AggregateRoot):
-    def __init__(self, entity_id: str, tenant_id: str, service_id: str, customer_ref: str,
+    def __init__(self, entity_id: str, debt_id: int, tenant_id: str, service_id: str, customer_ref: str,
                  amount: float, status: TransactionStatus, created_at: datetime, receipt_hash: str = None):
         super().__init__(entity_id)
+        self.debt_id = debt_id
         self.tenant_id = tenant_id
         self.service_id = service_id
         self.customer_ref = customer_ref
@@ -25,7 +26,10 @@ class Transaction(AggregateRoot):
         self.receipt_hash = receipt_hash
 
     @staticmethod
-    def create(tenant_id: str, service_id: str, customer_ref: str, amount: float):
+    def create(debt_id: int, tenant_id: str, service_id: str, customer_ref: str, amount: float):
+        if not isinstance(debt_id, int) or debt_id <= 0:
+            raise ValueError("El debt_id obligatorio debe ser un entero positivo.")
+
         AggregateRoot.check_rule(StringNotNullOrEmptyRule(tenant_id, "tenant_id"))
         AggregateRoot.check_rule(StringNotNullOrEmptyRule(service_id, "service_id"))
         AggregateRoot.check_rule(StringNotNullOrEmptyRule(customer_ref, "customer_ref"))
@@ -34,6 +38,7 @@ class Transaction(AggregateRoot):
         entity_id = f"txn-{int(time.time() * 1000)}"
         return Transaction(
             entity_id=entity_id,
+            debt_id=debt_id,
             tenant_id=tenant_id,
             service_id=service_id,
             customer_ref=customer_ref,

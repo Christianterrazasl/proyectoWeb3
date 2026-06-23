@@ -1,4 +1,4 @@
-import { CommandHandler } from "../../shared/core/CommandHandler.js";
+import { CommandHandler } from "../../shared/CommandHandler.js";
 
 export class UpdateServiceCommand extends CommandHandler {
   constructor(serviceRepository) {

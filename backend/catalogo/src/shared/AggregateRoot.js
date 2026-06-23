@@ -1,4 +1,4 @@
-import { Entity } from "./Entity.js";
+import { Entity } from "./core/Entity.js";
 import { BusinessRuleValidationException } from "./BusinessRuleValidationException.js";
 
 export class AggregateRoot extends Entity {

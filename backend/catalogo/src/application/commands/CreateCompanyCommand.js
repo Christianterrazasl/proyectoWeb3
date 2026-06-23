@@ -1,4 +1,4 @@
-import { CommandHandler } from "../../shared/core/CommandHandler.js";
+import { CommandHandler } from "../../shared/CommandHandler.js";
 import { Company } from "../../domain/models/Company.js";
 
 export class CreateCompanyCommand extends CommandHandler {

@@ -1,4 +1,4 @@
-import { CommandHandler } from "../../shared/core/CommandHandler.js";
+import { CommandHandler } from "../../shared/CommandHandler.js";
 import { Service } from "../../domain/models/Service.js";
 
 export class CreateServiceCommand extends CommandHandler {

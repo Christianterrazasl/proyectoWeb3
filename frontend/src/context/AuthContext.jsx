@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   clearAuthSession,
   getAccessToken,
@@ -9,8 +9,7 @@ import {
 } from "../utils/authStorage";
 import { getMeRequest } from "../services/authApi";
 import { getActiveCompany } from "../utils/tenancyUi";
-
-const AuthContext = createContext(null);
+import { AuthContext } from "./auth-context";
 
 function normalizeMePayload(mePayload) {
   if (!mePayload || typeof mePayload !== "object") {
@@ -103,11 +102,11 @@ export function AuthProvider({ children }) {
     setAuthState(nextAuthState);
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     clearAuthSession();
     setSession(null);
     setAuthState(null);
-  };
+  }, []);
 
   // Esto cambia el tenant activo SOLO en frontend por ahora.
   // Luego las futuras APIs protegidas usarán este valor en X-Company-Id.
@@ -136,7 +135,7 @@ export function AuthProvider({ children }) {
     });
   };
 
-  const refreshSession = async () => {
+  const refreshSession = useCallback(async () => {
     const access = getAccessToken();
     const refresh = getRefreshToken();
 
@@ -151,7 +150,7 @@ export function AuthProvider({ children }) {
     saveAuthSession({ access, refresh, user: meData });
     setSession({ access, refresh });
     setAuthState(nextAuthState);
-  };
+  }, [logout]);
 
   useEffect(() => {
     const bootstrapAuth = async () => {
@@ -166,7 +165,7 @@ export function AuthProvider({ children }) {
     };
 
     bootstrapAuth();
-  }, []);
+  }, [logout, refreshSession]);
 
   return (
     <AuthContext.Provider
@@ -188,14 +187,4 @@ export function AuthProvider({ children }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-
-  return context;
 }

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { FiBriefcase, FiCheckCircle, FiClock, FiLogOut, FiPlusCircle, FiShield } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import { createProviderDebt, listProviderDebts } from "../services/deudasApi";
 import {
   buildTenancyCompanies,

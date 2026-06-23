@@ -1,4 +1,4 @@
-const rawAuthApiUrl = import.meta.env.VITE_AUTH_API_URL || "/api/auth";
+const rawAuthApiUrl = import.meta.env?.VITE_AUTH_API_URL || "/api/auth";
 
 const authApiBaseUrl = rawAuthApiUrl.endsWith("/")
   ? rawAuthApiUrl.slice(0, -1)

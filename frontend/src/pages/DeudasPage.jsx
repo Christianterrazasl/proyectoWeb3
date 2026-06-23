@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { FiCalendar, FiCheckCircle, FiCreditCard, FiExternalLink, FiFileText, FiShield } from "react-icons/fi";
@@ -46,49 +46,66 @@ const DeudasPage = () => {
   const [transactionId, setTransactionId] = useState(null);
   const [qrCode, setQrCode] = useState(null);
   const [receiptHash, setReceiptHash] = useState(null);
+  const [successReceipt, setSuccessReceipt] = useState(null);
 
-  useEffect(() => {
+  const loadDebts = useCallback(async ({ showPageError = true } = {}) => {
     if (!idProveedor || !customerRef) {
-      setError("Faltan datos para consultar las deudas del cliente.");
+      if (showPageError) {
+        setError("Faltan datos para consultar las deudas del cliente.");
+      }
       setProvider(null);
       setDeudas([]);
       setSelectedDeudaId(null);
       return;
     }
 
-    let ignore = false;
-
-    const loadDebts = async () => {
-      setLoading(true);
+    setLoading(true);
+    if (showPageError) {
       setError("");
-      setSelectedDeudaId(null);
+    }
 
-      try {
-        const data = await getProviderCustomerDebts(idProveedor, customerRef);
+    try {
+      const data = await getProviderCustomerDebts(idProveedor, customerRef);
 
-        if (ignore) return;
+      setProvider(data.provider || null);
+      setDeudas(Array.isArray(data.debts) ? data.debts : []);
+      setSelectedDeudaId((currentId) => {
+        if (!currentId) {
+          return currentId;
+        }
 
-        setProvider(data.provider || null);
-        setDeudas(Array.isArray(data.debts) ? data.debts : []);
-      } catch (err) {
-        if (ignore) return;
+        return (data.debts || []).some((debt) => debt.id === currentId)
+          ? currentId
+          : null;
+      });
 
+      return data;
+    } catch (err) {
+      if (showPageError) {
         setError(err.message || "No se pudieron cargar las deudas");
         setProvider(null);
         setDeudas([]);
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
       }
-    };
 
-    loadDebts();
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [customerRef, idProveedor]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    loadDebts().catch(() => {
+      if (!ignore) {
+        setLoading(false);
+      }
+    });
 
     return () => {
       ignore = true;
     };
-  }, [idProveedor, customerRef]);
+  }, [loadDebts]);
 
   const selectedDeuda = useMemo(
     () => deudas.find((deuda) => deuda.id === selectedDeudaId) || null,
@@ -111,6 +128,7 @@ const DeudasPage = () => {
 
     try {
       const result = await createPaymentQr({
+        debt_id: selectedDeuda.id,
         tenant_id: idProveedor,
         service_id: selectedDeuda.serviceId,
         customer_ref: customerRef,
@@ -135,7 +153,20 @@ const DeudasPage = () => {
     try {
       const result = await confirmPayment({ transaction_id: transactionId });
       setReceiptHash(result.receipt_hash);
+      setSuccessReceipt({
+        hash: result.receipt_hash,
+        transactionId,
+      });
       setPaymentStep("success");
+
+      try {
+        await loadDebts({ showPageError: false });
+      } catch (refreshError) {
+        setPaymentError(
+          refreshError.message ||
+            "El pago se confirmó, pero no se pudo refrescar la lista de deudas.",
+        );
+      }
     } catch (err) {
       setPaymentError(err.message || "No se pudo confirmar el pago");
       setPaymentStep("error");
@@ -207,10 +238,11 @@ const DeudasPage = () => {
                           key={deuda.id}
                           type="button"
                           className={`lumina-interactive-card cursor-pointer text-left ${selected ? "is-active" : ""}`}
-                          onClick={() => {
-                            setSelectedDeudaId(deuda.id);
-                            resetPayment();
-                          }}
+                           onClick={() => {
+                              setSelectedDeudaId(deuda.id);
+                              setSuccessReceipt(null);
+                              resetPayment();
+                            }}
                         >
                           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div>
@@ -368,6 +400,27 @@ const DeudasPage = () => {
                           )}
                         </div>
                       </>
+                    )}
+                  </div>
+                ) : successReceipt ? (
+                  <div className="mt-6 rounded-[24px] border border-emerald-400/30 bg-emerald-500/10 p-6">
+                    <div className="flex items-center gap-3 text-emerald-200">
+                      <FiCheckCircle className="text-2xl" />
+                      <p className="text-lg font-semibold">Pago confirmado</p>
+                    </div>
+                    <p className="mt-4 text-sm text-emerald-100">
+                      Comprobante: {successReceipt.hash || successReceipt.transactionId}
+                    </p>
+                    {successReceipt.transactionId && (
+                      <a
+                        href={getReceiptUrl(successReceipt.transactionId)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="lumina-button-primary mt-6 inline-flex cursor-pointer"
+                      >
+                        <FiExternalLink />
+                        Ver comprobante
+                      </a>
                     )}
                   </div>
                 ) : (

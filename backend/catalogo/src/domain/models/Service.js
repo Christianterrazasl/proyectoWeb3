@@ -1,4 +1,4 @@
-import { AggregateRoot } from "../../shared/core/AggregateRoot.js";
+import { AggregateRoot } from "../../shared/AggregateRoot.js";
 import { StringNotNullOrEmptyRule } from "../../shared/rules/StringNotNullOrEmptyRule.js";
 import { ValidInputSchemaRule } from "../../shared/rules/ValidInputSchemaRule.js";
 
@@ -10,6 +10,7 @@ export class Service extends AggregateRoot {
     this.name = name;
     this.inputSchema = inputSchema;
     this.active = active;
+    this.isPublished = active;
   }
 
   // 2. Factory Method (Única vía legal para crear un servicio nuevo)
@@ -40,9 +41,11 @@ export class Service extends AggregateRoot {
 
   deactivate() {
     this.active = false;
+    this.isPublished = false;
   }
 
   activate() {
     this.active = true;
+    this.isPublished = true;
   }
 }
