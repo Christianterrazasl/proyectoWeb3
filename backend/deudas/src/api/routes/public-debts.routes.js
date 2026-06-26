@@ -1,4 +1,7 @@
-const { mapProvider, mapPublicDebt } = require("../../application/mappers/debt-presenters");
+const {
+  mapProvider,
+  mapPublicDebt,
+} = require("../../application/mappers/debt-presenters");
 const {
   isValidPublicIdentifier,
   normalizeInput,
@@ -9,10 +12,13 @@ function registerPublicDebtRoutes(app, { prismaClient }) {
   app.get("/debts", async (req, res) => {
     try {
       const { customer_ref, tenant_id, service_id, status } = req.query;
-      const debtId = req.query?.id === undefined ? undefined : parseDebtId(req.query.id);
+      const debtId =
+        req.query?.id === undefined ? undefined : parseDebtId(req.query.id);
 
       if (req.query?.id !== undefined && !debtId) {
-        return res.status(400).json({ message: "El identificador de la deuda es inválido" });
+        return res
+          .status(400)
+          .json({ message: "El identificador de la deuda es inválido" });
       }
 
       const debts = await prismaClient.debt.findMany({
@@ -53,65 +59,73 @@ function registerPublicDebtRoutes(app, { prismaClient }) {
     }
   });
 
-  app.get("/debts/providers/:tenantId/customers/:customerRef", async (req, res) => {
-    const tenantId = normalizeInput(req.params?.tenantId);
-    const customerRef = normalizeInput(req.params?.customerRef);
+  app.get(
+    "/debts/providers/:tenantId/customers/:customerRef",
+    async (req, res) => {
+      const tenantId = normalizeInput(req.params?.tenantId);
+      const customerRef = normalizeInput(req.params?.customerRef);
 
-    if (!tenantId || !customerRef) {
-      return res.status(400).json({
-        success: false,
-        message: "El proveedor y el identificador del cliente son obligatorios",
-      });
-    }
-
-    if (!isValidPublicIdentifier(tenantId)) {
-      return res.status(400).json({
-        success: false,
-        message: "El proveedor tiene un formato inválido",
-      });
-    }
-
-    try {
-      const provider = await prismaClient.provider.findUnique({
-        where: { tenant_id: tenantId },
-      });
-
-      if (!provider || !provider.active) {
-        return res.status(404).json({
+      if (!tenantId || !customerRef) {
+        return res.status(400).json({
           success: false,
-          message: "No se encontró un proveedor público para la consulta solicitada",
+          message:
+            "El proveedor y el identificador del cliente son obligatorios",
         });
       }
 
-      const debts = await prismaClient.debt.findMany({
-        where: {
-          tenant_id: tenantId,
-          customer_ref: customerRef,
-          status: "PENDING",
-        },
-        orderBy: { due_date: "asc" },
-      });
+      if (!isValidPublicIdentifier(tenantId)) {
+        return res.status(400).json({
+          success: false,
+          message: "El proveedor tiene un formato inválido",
+        });
+      }
 
-      res.json({
-        success: true,
-        data: {
-          provider: mapProvider(provider),
-          customerRef,
-          debts: debts.map(mapPublicDebt),
-        },
-        meta: {
-          tenantId,
-          totalDebts: debts.length,
-        },
-      });
-    } catch (error) {
-      console.error("GET /debts/providers/:tenantId/customers/:customerRef", error);
-      res.status(500).json({
-        success: false,
-        message: "No se pudieron obtener las deudas del cliente",
-      });
-    }
-  });
+      try {
+        const provider = await prismaClient.provider.findUnique({
+          where: { tenant_id: tenantId },
+        });
+
+        if (!provider || !provider.active) {
+          return res.status(404).json({
+            success: false,
+            message:
+              "No se encontró un proveedor público para la consulta solicitada",
+          });
+        }
+
+        const debts = await prismaClient.debt.findMany({
+          where: {
+            tenant_id: tenantId,
+            customer_ref: customerRef,
+            status: "PENDING",
+          },
+          orderBy: { due_date: "asc" },
+        });
+
+        res.json({
+          success: true,
+          data: {
+            provider: mapProvider(provider),
+            customerRef,
+            debts: debts.map(mapPublicDebt),
+          },
+          meta: {
+            tenantId,
+            totalDebts: debts.length,
+          },
+        });
+      } catch (error) {
+        console.error(
+          "GET /debts/providers/:tenantId/customers/:customerRef",
+          error,
+        );
+        res.status(500).json({
+          success: false,
+          message: "No se pudieron obtener las deudas del cliente",
+        });
+      }
+    },
+  );
 
   app.get("/debts/lookup", async (req, res) => {
     const tenantId = normalizeInput(req.query?.tenantId);
@@ -126,7 +140,8 @@ function registerPublicDebtRoutes(app, { prismaClient }) {
     }
 
     try {
-      const debt = await prismaClient.debt.findFirst({
+      // Modificado a findMany para soportar múltiples deudas (ej. 2 facturas de agua pendientes)
+      const debts = await prismaClient.debt.findMany({
         where: {
           tenant_id: tenantId,
           service_id: serviceId,
@@ -136,16 +151,17 @@ function registerPublicDebtRoutes(app, { prismaClient }) {
         orderBy: { due_date: "asc" },
       });
 
-      if (!debt) {
+      if (!debts || debts.length === 0) {
         return res.status(404).json({
           success: false,
-          message: "No se encontró una deuda pendiente para los datos proporcionados",
+          message:
+            "No se encontraron deudas pendientes para los datos proporcionados",
         });
       }
 
       return res.json({
         success: true,
-        data: mapPublicDebt(debt),
+        data: debts.map(mapPublicDebt),
       });
     } catch (error) {
       console.error("GET /debts/lookup", error);
@@ -207,13 +223,12 @@ function registerPublicDebtRoutes(app, { prismaClient }) {
     if (status !== "PAID") {
       return res.status(400).json({
         success: false,
-        message: "La sincronización interna solo permite marcar deudas exactas como pagadas",
+        message:
+          "La sincronización interna solo permite marcar deudas exactas como pagadas",
       });
     }
 
     try {
-      // Este endpoint es solo para el flujo interno de pagos: exige que la deuda
-      // exacta siga PENDING para no confirmar cobros sobre una deuda ya cambiada.
       const result = await prismaClient.debt.updateMany({
         where: {
           id: debtId,
@@ -225,7 +240,8 @@ function registerPublicDebtRoutes(app, { prismaClient }) {
       if (result.count !== 1) {
         return res.status(409).json({
           success: false,
-          message: "La deuda exacta ya no está pendiente y no se pudo sincronizar",
+          message:
+            "La deuda exacta ya no está pendiente y no se pudo sincronizar",
         });
       }
 
@@ -248,7 +264,9 @@ function registerPublicDebtRoutes(app, { prismaClient }) {
 
   app.post("/debts/lookup", async (req, res) => {
     const customerRef = normalizeInput(req.body?.customerRef);
-    const serviceId = req.body?.serviceId ? normalizeInput(req.body.serviceId) : undefined;
+    const serviceId = req.body?.serviceId
+      ? normalizeInput(req.body.serviceId)
+      : undefined;
 
     if (!customerRef) {
       return res.status(400).json({

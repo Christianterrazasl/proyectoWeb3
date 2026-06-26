@@ -1,32 +1,37 @@
-from __future__ import annotations
-
-from auth_tenancy.application.commands import LoginUserCommand
-from auth_tenancy.application.dto import LoginResultDTO, UserDTO
-from auth_tenancy.domain.exceptions import AuthenticationError
-from auth_tenancy.domain.repositories import UserRepository
-
+from ....application.commands.auth.login_user import LoginUserCommand
+from ....application.dto.auth_dto import AuthResponseDTO, UserDTO
+from ....domain.exceptions import AuthenticationError
+from ....infrastructure.persistence.models.user_model import UserModel
+from ....infrastructure.persistence.models.user_company_model import UserCompanyModel
+from ....infrastructure.security.password_hasher import PasswordHasher
+from ....infrastructure.security.jwt_service import JWTService
 
 class LoginUserHandler:
-    def __init__(self, user_repository: UserRepository, password_hasher, jwt_service):
-        self.user_repository = user_repository
-        self.password_hasher = password_hasher
-        self.jwt_service = jwt_service
+    def handle(self, command: LoginUserCommand) -> AuthResponseDTO:
+        try:
+            user_model = UserModel.objects.get(email=command.email)
+            hasher = PasswordHasher()
 
-    def handle(self, command: LoginUserCommand) -> LoginResultDTO:
-        user = self.user_repository.get_by_email(command.email.strip().lower())
+            if not hasher.verify(command.password, user_model.password):
+                raise AuthenticationError("Credenciales inválidas")
 
-        if user is None:
-            raise AuthenticationError("Invalid email or password")
+            tenant_id = None
+            if user_model.role == 'COMPANY_ADMIN':
+                user_company = UserCompanyModel.objects.filter(user=user_model).first()
+                if user_company:
+                    tenant_id = str(user_company.company.id)
 
-        if not user.is_active:
-            raise AuthenticationError("User is inactive")
+            jwt_service = JWTService()
+            token = jwt_service.generate_token(user_model, tenant_id)
 
-        if not self.password_hasher.verify(command.password, user.password_hash):
-            raise AuthenticationError("Invalid email or password")
+            user_dto = UserDTO(
+                id=str(user_model.id),
+                email=user_model.email,
+                global_role=user_model.role,
+                tenant_id=tenant_id
+            )
 
-        tokens = self.jwt_service.issue_tokens(user)
-        return LoginResultDTO(
-            refresh=tokens["refresh"],
-            access=tokens["access"],
-            user=UserDTO.from_entity(user),
-        )
+            return AuthResponseDTO(token=token, user=user_dto)
+
+        except UserModel.DoesNotExist:
+            raise AuthenticationError("Credenciales inválidas")

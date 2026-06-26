@@ -5,46 +5,24 @@ import { ServiceRepositoryImpl } from "../../infrastructure/repositories_impl/Se
 import { requireAdminSession } from "../middleware/requireAdminSession.js";
 
 const router = Router();
+const companyRepo = new CompanyRepositoryImpl();
+const serviceRepo = new ServiceRepositoryImpl();
+const controller = new CompanyController(companyRepo, serviceRepo);
 
-/**
- * Wiring simple del módulo catálogo.
- */
-const companyRepository = new CompanyRepositoryImpl();
-const serviceRepository = new ServiceRepositoryImpl();
-const controller = new CompanyController(companyRepository, serviceRepository);
-
-// Escritura admin protegida
-router.post("/admin/services", requireAdminSession, (req, res) =>
-  controller.createService(req, res),
+router.get("/public/services", (req, res) =>
+  controller.getPublicCatalog(req, res),
 );
 
-// Lectura admin protegida para reportes/panel
-router.get("/admin/services", requireAdminSession, (req, res) =>
-  controller.listAdminServices(req, res),
-);
+router.use(requireAdminSession);
 
-// Catálogo público
-router.get("/catalog/services", (req, res) => controller.getPublicCatalog(req, res));
+router.post("/companies", (req, res) => controller.createCompany(req, res));
+router.put("/companies/:id", (req, res) => controller.updateCompany(req, res));
 
-// --- Edición ---
-router.put(
-  "/companies/:id",
-  controller.updateCompany.bind(controller),
+router.post("/services", (req, res) => controller.createService(req, res));
+router.put("/services/:id", (req, res) => controller.updateService(req, res));
+router.get("/companies/:companyId/services", (req, res) =>
+  controller.getCompanyServices(req, res),
 );
-router.put(
-  "/services/:id",
-  controller.updateService.bind(controller),
-);
-
-// --- Flujo Proveedor (Panel de control) ---
-router.get(
-  "/companies/:companyId/services",
-  controller.getCompanyServices.bind(controller),
-);
-
-router.get(
-  "/services/:id",
-  controller.getServiceById.bind(controller),
-);
+router.get("/services", (req, res) => controller.listAdminServices(req, res));
 
 export default router;
