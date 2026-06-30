@@ -1,57 +1,83 @@
-import React, { useRef, useState } from "react";
-import { FaSearch } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { FaSearch, FaArrowLeft, FaFileInvoiceDollar } from "react-icons/fa";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { FiArrowRight, FiCreditCard, FiShield, FiZap } from "react-icons/fi";
-import { searchProvidersByDocument } from "../services/deudasApi";
+import { FiArrowRight } from "react-icons/fi";
+import {
+  getPublicCatalogServices,
+  searchDebtsLookup,
+} from "../services/deudasApi";
 
 const HomePage = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchedCustomerRef, setSearchedCustomerRef] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [catalogServices, setCatalogServices] = useState([]);
+  const [selectedService, setSelectedService] = useState(null);
+  const [customerRef, setCustomerRef] = useState("");
+  const [debts, setDebts] = useState([]);
+
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [loadingSearch, setLoadingSearch] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState("");
-  const latestSearchRequestRef = useRef(0);
 
-  const navigate = useNavigate();
+  useEffect(() => {
+    const fetchCatalog = async () => {
+      try {
+        const services = await getPublicCatalogServices();
+        setCatalogServices(services);
+      } catch (err) {
+        setError(err.message || "Error al cargar el catálogo.");
+      } finally {
+        setLoadingCatalog(false);
+      }
+    };
+    fetchCatalog();
+  }, []);
 
-  const handleSearch = async () => {
-    const normalizedCustomerRef = searchQuery.trim();
+  const handleSelectService = (service) => {
+    setSelectedService(service);
+    setCustomerRef("");
+    setDebts([]);
+    setHasSearched(false);
+    setError("");
+  };
 
-    if (normalizedCustomerRef.length < 1) {
-      return;
-    }
+  const handleBack = () => {
+    setSelectedService(null);
+    setCustomerRef("");
+    setDebts([]);
+    setHasSearched(false);
+    setError("");
+  };
 
-    setLoading(true);
+  const handleSearch = async (e) => {
+    e?.preventDefault();
+    const normalizedRef = customerRef.trim();
+    if (!normalizedRef || !selectedService) return;
+
+    setLoadingSearch(true);
     setError("");
     setHasSearched(true);
-    setSearchedCustomerRef(normalizedCustomerRef);
-
-    const currentSearchRequest = latestSearchRequestRef.current + 1;
-    latestSearchRequestRef.current = currentSearchRequest;
+    setDebts([]);
 
     try {
-      const results = await searchProvidersByDocument(normalizedCustomerRef);
-
-      if (latestSearchRequestRef.current !== currentSearchRequest) {
-        return;
-      }
-
-      setSearchResults(results);
+      const results = await searchDebtsLookup(
+        selectedService.companyId,
+        selectedService.id,
+        normalizedRef,
+      );
+      setDebts(results);
     } catch (err) {
-      if (latestSearchRequestRef.current !== currentSearchRequest) {
-        return;
-      }
-
-      setSearchResults([]);
-      setError(err.message || "No se pudo completar la búsqueda");
+      setError(err.message || "Error en la búsqueda.");
     } finally {
-      if (latestSearchRequestRef.current === currentSearchRequest) {
-        setLoading(false);
-      }
+      setLoadingSearch(false);
     }
   };
+
+  const inputSchema = selectedService?.inputSchema || {};
+  const inputLabel =
+    inputSchema.label || inputSchema.title || "Referencia del cliente";
+  const inputType = inputSchema.type || "text";
+  const inputPlaceholder =
+    inputSchema.placeholder || `Ej: Ingrese su ${inputLabel.toLowerCase()}`;
 
   return (
     <div className="lumina-page relative overflow-hidden">
@@ -63,163 +89,184 @@ const HomePage = () => {
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-        <section className="lumina-shell">
-          <div className="">
-            <div>
-              <div className="flex flex-wrap items-center gap-3 mb-4">
-                <div className="flex items-center gap-3 rounded-full border border-cyan-300/20 bg-slate-950/55 px-4 py-2 shadow-[0_0_30px_rgba(34,211,238,0.08)]">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-400/10 text-sm font-bold text-cyan-300">
-                    M
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-100">
-                      MultiPagos
-                    </p>
-                    <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400">
-                      Acceso público
-                    </p>
-                  </div>
-                </div>
-              </div>
+        <section className="mb-6">
+          <div className="flex items-center gap-3 rounded-full border border-cyan-300/20 bg-slate-950/55 px-4 py-2 w-max shadow-[0_0_30px_rgba(34,211,238,0.08)]">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-400/10 text-sm font-bold text-cyan-300">
+              M
             </div>
-
-            <div className="lumina-card rounded-[28px] border border-white/10 bg-slate-950/65 p-5 shadow-[0_30px_120px_rgba(15,23,42,0.5)] backdrop-blur-2xl sm:p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[24px] font-bold text-cyan-300">Buscar deudas</p>
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <label
-                  htmlFor="home-search"
-                  className="lumina-label mb-2 block text-slate-300"
-                >
-                  Documento o código de cliente
-                </label>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <input
-                    id="home-search"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    type="text"
-                    placeholder="Ej: 1234567 o COD-001"
-                    className="lumina-input"
-                  />
-
-                  <button
-                    type="button"
-                    className="lumina-button-primary min-w-[152px] cursor-pointer"
-                    onClick={handleSearch}
-                  >
-                    <FaSearch className="text-sm" />
-                    Buscar
-                  </button>
-                </div>
-              </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-100">MultiPagos</p>
+              <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400">
+                Portal Público
+              </p>
             </div>
           </div>
         </section>
 
-        <section className="mt-6 flex-1">
-          <div className="lumina-shell min-h-[420px]">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-slate-300">Resultados</p>
-                <h2 className="text-[24px] font-bold text-slate-100">
-                  Proveedores disponibles
-                </h2>
-              </div>
-              {hasSearched && !loading && !error && (
-                <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                  {searchResults.length} resultado(s)
-                </span>
-              )}
+        {!selectedService ? (
+          <section className="lumina-shell flex-1">
+            <div className="mb-6">
+              <h2 className="text-[28px] font-bold text-slate-100">
+                ¿Qué deseas pagar hoy?
+              </h2>
+              <p className="text-slate-400 mt-2">
+                Selecciona un servicio disponible.
+              </p>
             </div>
 
-            {loading ? (
+            {loadingCatalog ? (
               <div className="flex min-h-[320px] items-center justify-center">
                 <AiOutlineLoading3Quarters className="text-5xl animate-spin text-cyan-300" />
               </div>
             ) : error ? (
-              <div className="mt-6 flex min-h-[320px] items-center justify-center">
-                <div className="w-full max-w-2xl rounded-[24px] border border-rose-400/30 bg-rose-500/10 px-6 py-5 text-center text-rose-200">
-                  {error}
-                </div>
+              <div className="rounded-[24px] border border-rose-400/30 bg-rose-500/10 px-6 py-5 text-center text-rose-200">
+                {error}
               </div>
-            ) : searchResults.length > 0 ? (
-              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {searchResults.map((provider) => (
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {catalogServices.map((service) => (
                   <button
-                    key={provider.id}
+                    key={service.id}
                     type="button"
-                    className="lumina-interactive-card cursor-pointer text-left"
-                    onClick={() =>
-                      navigate(
-                        `/deuda/${provider.idProveedor}?customerRef=${encodeURIComponent(
-                          searchedCustomerRef,
-                        )}`,
-                      )
-                    }
+                    className="lumina-interactive-card cursor-pointer text-left h-full"
+                    onClick={() => handleSelectService(service)}
                   >
-                    <div className="overflow-hidden rounded-[18px] border border-white/8 bg-slate-950/70">
-                      <div className="h-[220px] w-full overflow-hidden">
-                        <img
-                          src={provider.image}
-                          alt={provider.name}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-5 flex items-start justify-between gap-4">
+                    <div className="mt-2 flex items-start justify-between gap-4">
                       <div>
-                        <p className="lumina-label text-cyan-300">Proveedor</p>
+                        <p className="lumina-label text-cyan-300">
+                          {service.companyName}
+                        </p>
                         <h3 className="mt-3 text-xl font-semibold text-slate-100">
-                          {provider.name}
+                          {service.name}
                         </h3>
                       </div>
                       <span className="rounded-full border border-cyan-300/15 bg-cyan-300/8 p-2 text-cyan-200">
                         <FiArrowRight />
                       </span>
                     </div>
-
-                    <p className="mt-3 text-sm leading-6 text-slate-400">
-                      {provider.description}
-                    </p>
+                    {service.description && (
+                      <p className="mt-3 text-sm leading-6 text-slate-400">
+                        {service.description}
+                      </p>
+                    )}
                   </button>
                 ))}
               </div>
-            ) : hasSearched ? (
-              <div className="mt-6 flex min-h-[320px] items-center justify-center text-center">
-                <div className="max-w-xl rounded-[24px] border border-white/8 bg-white/[0.03] px-6 py-8">
-                  <p className="text-lg font-semibold text-slate-100">
-                    Sin coincidencias
-                  </p>
-                  <p className="mt-3 text-sm leading-6 text-slate-400">
-                    No se encontraron deudas para el número de documento
-                    ingresado.
-                  </p>
+            )}
+          </section>
+        ) : (
+          <section className="flex-1 flex flex-col gap-6">
+            <div className="lumina-shell">
+              <button
+                onClick={handleBack}
+                className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 mb-6 text-sm font-medium transition-colors cursor-pointer"
+              >
+                <FaArrowLeft /> Volver al catálogo
+              </button>
+
+              <h2 className="text-[24px] font-bold text-cyan-300">
+                {selectedService.name}
+              </h2>
+              <p className="text-slate-400 mt-1">
+                {selectedService.companyName}
+              </p>
+
+              <form onSubmit={handleSearch} className="mt-8 max-w-2xl">
+                <label className="lumina-label mb-2 block text-slate-300">
+                  {inputLabel}
+                </label>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <input
+                    type={inputType}
+                    value={customerRef}
+                    onChange={(e) => setCustomerRef(e.target.value)}
+                    placeholder={inputPlaceholder}
+                    className="lumina-input"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="lumina-button-primary min-w-[152px] cursor-pointer"
+                    disabled={loadingSearch}
+                  >
+                    {loadingSearch ? (
+                      <AiOutlineLoading3Quarters className="animate-spin mx-auto" />
+                    ) : (
+                      <>
+                        <FaSearch /> Buscar
+                      </>
+                    )}
+                  </button>
                 </div>
-              </div>
-            ) : (
-              <div className="mt-6 flex min-h-[320px] items-center justify-center text-center">
-                <div className="max-w-xl rounded-[24px] border border-white/8 bg-white/[0.03] px-6 py-8">
-                  <p className="text-lg font-semibold text-slate-100">
-                    Tu búsqueda empieza aquí
-                  </p>
-                  <p className="mt-3 text-sm leading-6 text-slate-400">
-                    Ingresa tu CI/NIT o código de cliente para ver tus deudas.
-                  </p>
-                </div>
+              </form>
+            </div>
+
+            {hasSearched && (
+              <div className="lumina-shell flex-1">
+                <h3 className="text-[20px] font-bold text-slate-100 mb-6">
+                  Deudas Pendientes
+                </h3>
+
+                {loadingSearch ? (
+                  <div className="flex min-h-[200px] items-center justify-center">
+                    <AiOutlineLoading3Quarters className="text-4xl animate-spin text-cyan-300" />
+                  </div>
+                ) : error ? (
+                  <div className="rounded-[24px] border border-cyan-400/20 bg-cyan-500/10 px-6 py-8 text-center text-cyan-100 flex flex-col items-center justify-center min-h-[200px]">
+                    <FaCheckCircle className="text-4xl text-cyan-400 mb-3" />
+                    <p className="text-lg font-semibold">{error}</p>
+                    <p className="text-sm mt-2 text-cyan-300/80">
+                      Estás al día con este servicio.
+                    </p>
+                  </div>
+                ) : debts.length > 0 ? (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {debts.map((debt, idx) => (
+                      <div
+                        key={debt.id || idx}
+                        className="rounded-[20px] border border-white/10 bg-slate-900/60 p-5 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-xl">
+                            <FaFileInvoiceDollar />
+                          </div>
+                          <div>
+                            <p className="text-slate-300 text-sm">
+                              Periodo: {debt.period || "N/A"}
+                            </p>
+                            <p className="text-slate-100 font-bold text-lg mt-1">
+                              Bs. {Number(debt.amount).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="rounded-full bg-rose-500/20 text-rose-300 px-3 py-1 text-xs font-semibold uppercase tracking-wider border border-rose-500/30">
+                          Pendiente
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             )}
-          </div>
-        </section>
+          </section>
+        )}
       </div>
     </div>
   );
 };
+
+const FaCheckCircle = (props) => (
+  <svg
+    stroke="currentColor"
+    fill="currentColor"
+    strokeWidth="0"
+    viewBox="0 0 512 512"
+    height="1em"
+    width="1em"
+    {...props}
+  >
+    <path d="M256 8C119.033 8 8 119.033 8 256s111.033 248 248 248 248-111.033 248-248S392.967 8 256 8zm113.522 178.683l-137.28 174.153a15.999 15.999 0 01-24.168 1.157l-78.077-78.077a16 16 0 010-22.627l22.627-22.627a16 16 0 0122.627 0l43.208 43.208 102.771-130.34a16 16 0 0124.62-1.782l21.89 21.89a16 16 0 011.782 24.615z"></path>
+  </svg>
+);
 
 export default HomePage;

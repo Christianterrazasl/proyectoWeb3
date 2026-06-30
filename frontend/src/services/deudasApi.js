@@ -1,5 +1,8 @@
 const DEUDAS_API_BASE = import.meta.env?.VITE_DEUDAS_API_URL || "/debts";
-const ADMIN_DEBTS_BASE = import.meta.env?.VITE_ADMIN_DEBTS_API_URL || "/api/admin/debts";
+const ADMIN_DEBTS_BASE =
+  import.meta.env?.VITE_ADMIN_DEBTS_API_URL || "/api/admin/debts";
+
+const GATEWAY_BASE = "http://localhost:3000";
 
 async function parseJsonResponse(response) {
   const contentType = response.headers.get("content-type") || "";
@@ -20,6 +23,34 @@ function getAdminDebtsUrl(status) {
   }
 
   return url.pathname + url.search;
+}
+
+export async function getPublicCatalogServices() {
+  const response = await fetch(`${GATEWAY_BASE}/api/catalog/public/services`);
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message || "Error al cargar los servicios disponibles",
+    );
+  }
+  return data?.data || data || [];
+}
+
+export async function searchDebtsLookup(tenantId, serviceId, customerRef) {
+  const url = `${GATEWAY_BASE}/debts/lookup?tenantId=${encodeURIComponent(tenantId)}&serviceId=${encodeURIComponent(serviceId)}&customerRef=${encodeURIComponent(customerRef)}`;
+  const response = await fetch(url);
+
+  if (response.status === 404) {
+    throw new Error("No tienes deudas pendientes");
+  }
+
+  const data = await parseJsonResponse(response);
+  if (!response.ok) {
+    throw new Error(data?.message || "Error al buscar deudas");
+  }
+
+  return Array.isArray(data) ? data : (data?.data ?? []);
 }
 
 export async function searchProvidersByDocument(customerRef) {
@@ -51,9 +82,6 @@ export async function getPublicProviders() {
   return data?.data ?? [];
 }
 
-// Este endpoint YA existe en backend.
-// Devuelve el proveedor seleccionado y las deudas pendientes reales
-// del customerRef para ese tenant/proveedor.
 export async function getProviderCustomerDebts(tenantId, customerRef) {
   const response = await fetch(
     `${DEUDAS_API_BASE}/providers/${encodeURIComponent(
@@ -64,9 +92,7 @@ export async function getProviderCustomerDebts(tenantId, customerRef) {
   const data = await parseJsonResponse(response);
 
   if (!response.ok) {
-    throw new Error(
-      data?.message || "Error al cargar las deudas del cliente",
-    );
+    throw new Error(data?.message || "Error al cargar las deudas del cliente");
   }
 
   return data?.data ?? { provider: null, customerRef, debts: [] };
@@ -93,7 +119,9 @@ export async function listProviderDebts({ accessToken, companyId, status }) {
   const data = await parseJsonResponse(response);
 
   if (!response.ok) {
-    throw new Error(data?.message || "No se pudieron cargar las deudas del proveedor");
+    throw new Error(
+      data?.message || "No se pudieron cargar las deudas del proveedor",
+    );
   }
 
   return data?.data ?? [];

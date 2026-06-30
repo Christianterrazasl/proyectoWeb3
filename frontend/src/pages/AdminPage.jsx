@@ -162,13 +162,8 @@ const AdminPage = () => {
   const [auditRows, setAuditRows] = useState([]);
   const [dashboardError, setDashboardError] = useState("");
 
-  const {
-    logout,
-    user,
-    memberships,
-    accessibleCompanies,
-    activeCompanyId,
-  } = useAuth();
+  const { logout, user, memberships, accessibleCompanies, activeCompanyId } =
+    useAuth();
 
   useEffect(() => {
     const token = getAccessToken();
@@ -178,13 +173,14 @@ const AdminPage = () => {
 
     const loadDashboard = async () => {
       try {
-        const [summary, portfolio, services, transactions, auditLogs] = await Promise.all([
-          getDashboardSummary(token, activeCompanyId),
-          getCompanyPortfolioSummary(token, activeCompanyId),
-          getServiceKpis(token, activeCompanyId),
-          getTransactionMonitoring(token, activeCompanyId),
-          getAuditLogs(token, activeCompanyId),
-        ]);
+        const [summary, portfolio, services, transactions, auditLogs] =
+          await Promise.all([
+            getDashboardSummary(token, activeCompanyId),
+            getCompanyPortfolioSummary(token, activeCompanyId),
+            getServiceKpis(token, activeCompanyId),
+            getTransactionMonitoring(token, activeCompanyId),
+            getAuditLogs(token, activeCompanyId),
+          ]);
 
         if (!ignore) {
           setDashboard(summary);
@@ -217,6 +213,7 @@ const AdminPage = () => {
     () => buildKpiCardsFromDashboard(dashboard),
     [dashboard],
   );
+
   const tenancyCompanies = buildTenancyCompanies(
     accessibleCompanies,
     memberships,
@@ -229,6 +226,13 @@ const AdminPage = () => {
     logout();
     navigate("/login");
   };
+
+  const visibleSidebarItems = sidebarItems.filter((item) => {
+    if (item.label === "Empresas" && user?.global_role === "COMPANY_ADMIN") {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <div className="lumina-page relative overflow-hidden">
@@ -278,7 +282,7 @@ const AdminPage = () => {
             </div>
 
             <nav className="mt-8 flex flex-col gap-2">
-              {sidebarItems.map((item) => (
+              {visibleSidebarItems.map((item) => (
                 <SidebarItem key={item.label} {...item} />
               ))}
             </nav>
@@ -308,7 +312,11 @@ const AdminPage = () => {
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button type="button" className="lumina-button-secondary" onClick={() => window.location.reload()}>
+                <button
+                  type="button"
+                  className="lumina-button-secondary"
+                  onClick={() => window.location.reload()}
+                >
                   <FiRefreshCw />
                   Actualizar vista
                 </button>
@@ -457,7 +465,8 @@ const AdminPage = () => {
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {dashboardError && (
               <div className="md:col-span-2 xl:col-span-4 rounded-[24px] border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-100">
-                 {dashboardError} — algunos bloques quedaron vacíos hasta el próximo refresh.
+                {dashboardError} — algunos bloques quedaron vacíos hasta el
+                próximo refresh.
               </div>
             )}
             {kpiCards.map((card) => (
@@ -546,10 +555,17 @@ const AdminPage = () => {
                 <div className="mt-6 space-y-4">
                   {serviceRows
                     .slice()
-                    .sort((left, right) => Number(right.pending_amount || 0) - Number(left.pending_amount || 0))
+                    .sort(
+                      (left, right) =>
+                        Number(right.pending_amount || 0) -
+                        Number(left.pending_amount || 0),
+                    )
                     .slice(0, 5)
                     .map((service) => (
-                      <div key={`${service.company_id}-${service.service_id}`} className="lumina-activity-item">
+                      <div
+                        key={`${service.company_id}-${service.service_id}`}
+                        className="lumina-activity-item"
+                      >
                         <div className="lumina-activity-dot is-info" />
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -561,7 +577,10 @@ const AdminPage = () => {
                             </span>
                           </div>
                           <p className="mt-2 text-sm leading-6 text-slate-400">
-                            {service.company_name || `Empresa ${service.company_id}`} · {service.pending_debts} pendiente(s) de {service.total_debts} deuda(s)
+                            {service.company_name ||
+                              `Empresa ${service.company_id}`}{" "}
+                            · {service.pending_debts} pendiente(s) de{" "}
+                            {service.total_debts} deuda(s)
                           </p>
                         </div>
                       </div>
@@ -591,27 +610,37 @@ const AdminPage = () => {
 
                 <div className="mt-6 space-y-4">
                   {transactionRows.slice(0, 3).map((item) => (
-                    <div key={item.transaction_id} className="lumina-activity-item">
+                    <div
+                      key={item.transaction_id}
+                      className="lumina-activity-item"
+                    >
                       <div
                         className={`lumina-activity-dot ${item.status === "FAILED" ? "is-warning" : "is-success"}`}
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <p className="font-medium text-slate-100">
-                            {item.service_name || item.service_id || item.transaction_id}
+                            {item.service_name ||
+                              item.service_id ||
+                              item.transaction_id}
                           </p>
                           <span className="text-xs uppercase tracking-[0.16em] text-slate-500">
                             {formatDateTime(item.created_at)}
                           </span>
                         </div>
                         <p className="mt-2 text-sm leading-6 text-slate-400">
-                          {item.company_name || `Empresa ${item.company_id}`} · {formatStatus(item.status)} · {formatAmount(item.amount)}
+                          {item.company_name || `Empresa ${item.company_id}`} ·{" "}
+                          {formatStatus(item.status)} ·{" "}
+                          {formatAmount(item.amount)}
                         </p>
                       </div>
                     </div>
                   ))}
                   {auditRows.slice(0, 2).map((item) => (
-                    <div key={`audit-${item.id}-${item.created_at}`} className="lumina-activity-item">
+                    <div
+                      key={`audit-${item.id}-${item.created_at}`}
+                      className="lumina-activity-item"
+                    >
                       <div className="lumina-activity-dot is-neutral" />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -623,7 +652,8 @@ const AdminPage = () => {
                           </span>
                         </div>
                         <p className="mt-2 text-sm leading-6 text-slate-400">
-                          {(item.actor_email || "Sistema")} · {item.resource_type || "reporte"}
+                          {item.actor_email || "Sistema"} ·{" "}
+                          {item.resource_type || "reporte"}
                         </p>
                       </div>
                     </div>

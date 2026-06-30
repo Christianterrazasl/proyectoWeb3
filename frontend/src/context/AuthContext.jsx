@@ -21,6 +21,8 @@ function normalizeMePayload(mePayload) {
       ? mePayload.user
       : mePayload;
 
+  const tenantId = normalizedUser?.tenant_id || mePayload.tenant_id;
+
   return {
     user: normalizedUser,
     memberships: Array.isArray(mePayload.memberships)
@@ -29,7 +31,7 @@ function normalizeMePayload(mePayload) {
     accessibleCompanies: Array.isArray(mePayload.accessible_companies)
       ? mePayload.accessible_companies
       : [],
-    activeCompanyId: mePayload.active_company_id ?? null,
+    activeCompanyId: tenantId ?? mePayload.active_company_id ?? null,
     raw: mePayload,
   };
 }
@@ -42,13 +44,11 @@ function normalizeCompanyId(companyId) {
     : null;
 }
 
-// Regla del frontend:
-// 1. si hay una empresa guardada y el usuario todavía tiene acceso, la usamos
-// 2. si no, usamos la que venga desde /me
-// 3. si tampoco existe, usamos la primera accesible
 function resolveActiveCompanyId(normalizedState) {
   const storedActiveCompanyId = getStoredActiveCompanyId();
-  const accessibleCompanies = Array.isArray(normalizedState?.accessibleCompanies)
+  const accessibleCompanies = Array.isArray(
+    normalizedState?.accessibleCompanies,
+  )
     ? normalizedState.accessibleCompanies
     : [];
 
@@ -108,8 +108,6 @@ export function AuthProvider({ children }) {
     setAuthState(null);
   }, []);
 
-  // Esto cambia el tenant activo SOLO en frontend por ahora.
-  // Luego las futuras APIs protegidas usarán este valor en X-Company-Id.
   const setActiveCompany = (companyId) => {
     const nextCompanyId = normalizeCompanyId(companyId);
 
