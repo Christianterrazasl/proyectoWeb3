@@ -13,7 +13,7 @@ class UserDTO:
             "tenant_id": self.tenant_id
         }
 
-class AuthResponseDTO:
+class LoginResultDTO:
     def __init__(self, token: str, user: UserDTO):
         self.token = token
         self.user = user

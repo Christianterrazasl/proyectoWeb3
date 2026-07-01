@@ -13,6 +13,10 @@ router.get("/public/services", (req, res) =>
   controller.getPublicCatalog(req, res),
 );
 
+router.get("/public/companies/:companyId/services", (req, res) =>
+  controller.getCompanyServices(req, res),
+);
+
 router.use(requireAdminSession);
 
 router.post("/companies", (req, res) => controller.createCompany(req, res));

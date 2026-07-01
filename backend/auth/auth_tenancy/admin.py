@@ -12,9 +12,9 @@ class UserAdmin(admin.ModelAdmin):
 
 @admin.register(CompanyModel)
 class CompanyAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "nit", "status", "active")
-    list_filter = ("status", "active")
-    search_fields = ("name", "nit")
+    list_display = ('name', 'nit', 'slug', 'category', 'status', 'is_public')
+    list_filter = ('status', 'is_public', 'category')
+    search_fields = ('name', 'nit', 'slug')
 
 
 @admin.register(MembershipModel)

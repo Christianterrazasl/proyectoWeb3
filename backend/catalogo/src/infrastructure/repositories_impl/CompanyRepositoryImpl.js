@@ -38,7 +38,7 @@ export class CompanyRepositoryImpl {
 
   async findAllForRead() {
     return await CompanyModel.find(
-      { status: "ACTIVE" },
+      { status: "APPROVED" },
       { _id: 0, __v: 0 },
     ).lean();
   }

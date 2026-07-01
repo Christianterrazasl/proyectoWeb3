@@ -20,6 +20,10 @@ from auth_tenancy.interfaces.api.serializers import (
     UpdateCompanySerializer,
 )
 from auth_tenancy.interfaces.api.views.base import BaseApiView
+from rest_framework.permissions import AllowAny
+from django.db.models import Q
+from rest_framework.views import APIView
+from rest_framework.response import Response
 
 
 class CompanyListCreateView(BaseApiView):
@@ -127,3 +131,44 @@ class CompanyStatusView(BaseApiView):
             return self.success_response(result)
         except Exception as error:
             return self.handle_domain_exception(error)
+
+class PublicCompanyListView(APIView):
+    """ GET /api/auth/public/companies/ -> Devuelve tarjetas para el Home """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        companies = CompanyModel.objects.filter(is_public=True, status='APPROVED').values(
+            'id', 'name', 'logo_url', 'slug', 'category', 'short_description'
+        )
+        return Response({
+            "success": True,
+            "data": list(companies)
+        })
+
+
+class PublicCompanyDetailView(APIView):
+    """ GET /api/auth/public/companies/:slug -> Devuelve metadata de 1 sola empresa """
+    permission_classes = [AllowAny]
+
+    def get(self, request, identifier):
+        # Soporta buscar por Slug o por UUID (Retrocompatibilidad)
+        try:
+            import uuid
+            uuid_obj = uuid.UUID(identifier)
+            q_filter = Q(id=uuid_obj)
+        except ValueError:
+            q_filter = Q(slug=identifier)
+
+        company = CompanyModel.objects.filter(
+            q_filter, is_public=True, status='APPROVED'
+        ).values(
+            'id', 'name', 'logo_url', 'slug', 'category', 'short_description', 'fiscal_address'
+        ).first()
+
+        if not company:
+            return Response({"success": False, "message": "Empresa pública no encontrada"}, status=404)
+
+        return Response({
+            "success": True,
+            "data": company
+        })

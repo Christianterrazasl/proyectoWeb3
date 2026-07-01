@@ -12,6 +12,7 @@ from auth_tenancy.interfaces.api.views.company_views import (
 )
 from auth_tenancy.interfaces.api.views.membership_views import MembershipDetailView, MembershipListCreateView
 from auth_tenancy.interfaces.api.views.user_views import UserDetailView, UserGlobalRoleView, UserListView
+from auth_tenancy.interfaces.api.views.company_views import PublicCompanyListView, PublicCompanyDetailView
 
 urlpatterns = [
     path("register/", RegisterUserView.as_view(), name="register-user"),
@@ -27,4 +28,6 @@ urlpatterns = [
     path("memberships/", MembershipListCreateView.as_view(), name="memberships"),
     path("memberships/<int:membership_id>/", MembershipDetailView.as_view(), name="membership-detail"),
     path("user-companies/", MembershipListCreateView.as_view(), name="legacy-user-companies"),
+    path('public/companies/', PublicCompanyListView.as_view(), name='public-companies'),
+    path('public/companies/<str:identifier>/', PublicCompanyDetailView.as_view(), name='public-company-detail'),
 ]
