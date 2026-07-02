@@ -1,7 +1,8 @@
 import { Company } from "../../domain/models/Company.js";
 import { CompanyModel } from "../database/mongodb/CompanySchema.js";
 import { CompanyEntity } from "../database/postgres/CompanyEntity.js";
-import { getPostgresConnection } from "../database/connection.js";
+//import { getPostgresConnection } from "../database/connection.js";
+import { AppDataSource } from "../database/connection.js";
 
 export class CompanyRepositoryImpl {
   async findById(id) {

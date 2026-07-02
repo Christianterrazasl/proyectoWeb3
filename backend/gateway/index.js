@@ -71,8 +71,14 @@ app.use(
 );
 
 // Catálogo (Protegido y Público)
-app.use("/api/admin", proxy("http://catalogo:3000"));
-app.use("/api/catalog", proxy("http://catalogo:3000"));
+app.use(
+  "/api/admin",
+  proxy("http://catalogo:3000", { "^/api/admin": "/api/admin" }),
+);
+app.use(
+  "/api/catalog",
+  proxy("http://catalogo:3000", { "^/api/catalog": "/api" }),
+);
 
 // Pagos
 app.use(
