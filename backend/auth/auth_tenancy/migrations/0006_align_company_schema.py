@@ -3,7 +3,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('auth_tenancy', '0005_auto_20230920_1234'),
+        ("auth_tenancy", "0005_refactor_auth_tenancy"),
     ]
 
     operations = [

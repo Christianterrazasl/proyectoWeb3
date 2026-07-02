@@ -2,6 +2,7 @@ from .auth import GetCurrentUserHandler, LoginUserHandler, RegisterUserHandler
 from .company import (
     ChangeCompanyStatusHandler,
     CreateCompanyHandler,
+    DeleteCompanyHandler,
     GetCompanyDetailHandler,
     ListCompaniesHandler,
     UpdateCompanyHandler,
@@ -19,6 +20,7 @@ __all__ = [
     "CreateCompanyHandler",
     "UpdateCompanyHandler",
     "ChangeCompanyStatusHandler",
+    "DeleteCompanyHandler",
     "ListCompaniesHandler",
     "GetCompanyDetailHandler",
     "AssignMembershipHandler",

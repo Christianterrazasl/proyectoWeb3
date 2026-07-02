@@ -1,8 +1,10 @@
 const DEUDAS_API_BASE = import.meta.env?.VITE_DEUDAS_API_URL || "/debts";
 const ADMIN_DEBTS_BASE =
   import.meta.env?.VITE_ADMIN_DEBTS_API_URL || "/api/admin/debts";
-
-const GATEWAY_BASE = "http://localhost:3000";
+const ADMIN_PROVIDERS_BASE =
+  import.meta.env?.VITE_ADMIN_PROVIDERS_API_URL || "/api/admin/providers";
+const CATALOG_API_BASE =
+  import.meta.env?.VITE_CATALOG_API_URL || "/api/catalog";
 
 async function parseJsonResponse(response) {
   const contentType = response.headers.get("content-type") || "";
@@ -26,7 +28,7 @@ function getAdminDebtsUrl(status) {
 }
 
 export async function getPublicCatalogServices() {
-  const response = await fetch(`${GATEWAY_BASE}/api/catalog/public/services`);
+  const response = await fetch(`${CATALOG_API_BASE}/public/services`);
   const data = await parseJsonResponse(response);
 
   if (!response.ok) {
@@ -38,19 +40,32 @@ export async function getPublicCatalogServices() {
 }
 
 export async function searchDebtsLookup(tenantId, serviceId, customerRef) {
-  const url = `${GATEWAY_BASE}/debts/lookup?tenantId=${encodeURIComponent(tenantId)}&serviceId=${encodeURIComponent(serviceId)}&customerRef=${encodeURIComponent(customerRef)}`;
-  const response = await fetch(url);
+  const url = new URL(`${DEUDAS_API_BASE}/lookup`, window.location.origin);
+  url.searchParams.set("tenantId", tenantId);
+  url.searchParams.set("serviceId", serviceId);
+  url.searchParams.set("customerRef", customerRef);
+
+  const response = await fetch(url.pathname + url.search);
+  const data = await parseJsonResponse(response);
 
   if (response.status === 404) {
-    throw new Error("No tienes deudas pendientes");
+    const error = new Error(
+      data?.message || "No tienes deudas pendientes",
+    );
+    error.status = 404;
+    throw error;
   }
 
-  const data = await parseJsonResponse(response);
   if (!response.ok) {
     throw new Error(data?.message || "Error al buscar deudas");
   }
 
-  return Array.isArray(data) ? data : (data?.data ?? []);
+  const payload = data?.data ?? data;
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  return payload ? [payload] : [];
 }
 
 export async function searchProvidersByDocument(customerRef) {
@@ -128,6 +143,72 @@ export async function listProviderDebts({ accessToken, companyId, status }) {
 }
 
 export { getAdminDebtsUrl };
+
+function adminAuthHeaders(accessToken) {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  };
+}
+
+export async function listAdminProviders(accessToken) {
+  const response = await fetch(ADMIN_PROVIDERS_BASE, {
+    headers: adminAuthHeaders(accessToken),
+  });
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(data?.message || "No se pudieron cargar los proveedores");
+  }
+
+  return data?.data ?? [];
+}
+
+export async function createAdminProvider({
+  accessToken,
+  tenantId,
+  name,
+  description,
+  imageUrl,
+}) {
+  const response = await fetch(ADMIN_PROVIDERS_BASE, {
+    method: "POST",
+    headers: adminAuthHeaders(accessToken),
+    body: JSON.stringify({
+      tenantId: String(tenantId),
+      name,
+      description,
+      imageUrl,
+    }),
+  });
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(data?.message || "No se pudo registrar el proveedor");
+  }
+
+  return data?.data;
+}
+
+export async function deleteAdminProvider(accessToken, tenantId) {
+  const response = await fetch(
+    `${ADMIN_PROVIDERS_BASE}/${encodeURIComponent(String(tenantId))}`,
+    {
+      method: "DELETE",
+      headers: adminAuthHeaders(accessToken),
+    },
+  );
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(data?.message || "No se pudo eliminar el proveedor");
+  }
+
+  return data?.data;
+}
 
 export async function createProviderDebt({
   accessToken,

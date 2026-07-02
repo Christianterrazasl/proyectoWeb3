@@ -20,9 +20,7 @@ test("buildPublicCatalogBrowserState prioritizes the loading state while the cat
   assert.equal(state.matchCountLabel, "1 coincidencia(s)");
   assert.deepEqual(state.contentState, {
     variant: "loading",
-    title: "Cargando empresas disponibles",
-    description:
-      "Estamos consultando el catálogo público actual para mostrarte las empresas y servicios habilitados.",
+    title: "Cargando empresas",
   });
 });
 
@@ -36,7 +34,7 @@ test("buildPublicCatalogBrowserState surfaces the catalog error when loading alr
   assert.equal(state.matchCountLabel, "2 coincidencia(s)");
   assert.deepEqual(state.contentState, {
     variant: "error",
-    title: "No se pudo cargar el catálogo público",
+    title: "Error al cargar el catálogo",
     description: "No autorizado",
   });
 });
@@ -51,9 +49,7 @@ test("buildPublicCatalogBrowserState reports an empty state when no company matc
   assert.equal(state.matchCountLabel, "0 coincidencia(s)");
   assert.deepEqual(state.contentState, {
     variant: "empty",
-    title: "No encontramos coincidencias",
-    description:
-      "Prueba con otro nombre, servicio o categoría para continuar con la consulta pública.",
+    title: "Sin resultados",
   });
 });
 
@@ -285,11 +281,7 @@ test("buildPublicResultsSummary aggregates debt context for successful lookups w
     customerRef: "REF-88",
   });
 
-  assert.equal(summary.title, "Encontramos 2 deudas pendientes");
-  assert.equal(
-    summary.description,
-    "Valida empresa, referencia y periodos antes de pasar al detalle de deudas y al pago QR.",
-  );
+  assert.equal(summary.title, "Encontramos 2 deuda(s)");
   assert.equal(summary.totalAmountLabel, "Bs. 14.75");
   assert.equal(summary.detailItems[0].value, "Aguas del Sur");
   assert.equal(summary.detailItems[1].value, "Agua Hogar");

@@ -27,5 +27,5 @@ PY
 fi
 
 python manage.py migrate --noinput
-python manage.py seed_auth_tenancy
+python manage.py seed_auth_tenancy || echo "⚠️ seed_auth_tenancy falló; el servicio seguirá arrancando"
 python manage.py runserver 0.0.0.0:${PORT:-3000}

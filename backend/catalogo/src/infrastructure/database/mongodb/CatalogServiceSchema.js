@@ -15,6 +15,8 @@ const CatalogServiceSchema = new mongoose.Schema({
   companyActive: { type: Boolean, required: true },
   companyLogoUrl: { type: String, required: false },
   serviceName: { type: String, required: true },
+  category: { type: String, required: false },
+  description: { type: String, required: false },
   inputSchema: { type: Object, required: true },
   isPublished: { type: Boolean, required: true, default: true },
 });

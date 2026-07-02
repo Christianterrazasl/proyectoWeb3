@@ -9,6 +9,8 @@ export class CreateCompanyCommand extends CommandHandler {
 
   async execute(data) {
     const company = Company.create(data.id, data.name);
+    company.status = "APPROVED";
+    company.active = true;
 
     await this.companyRepository.save(company);
 

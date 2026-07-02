@@ -22,15 +22,11 @@ test("buildPublicReceiptPageModel prioritizes success context from the public pa
     },
   });
 
-  assert.equal(model.title, "Comprobante listo para compartir");
-  assert.equal(
-    model.description,
-    "Tu pago fue procesado dentro del portal público. Revisa el resumen final, conserva este identificador y abre el comprobante oficial si necesitas compartirlo o descargarlo.",
-  );
+  assert.equal(model.title, "Comprobante de pago");
   assert.equal(model.receiptLabel, "RCPT-123");
   assert.equal(model.statusLabel, "Pago confirmado");
   assert.equal(model.canOpenOfficialReceipt, true);
-  assert.equal(model.downloadLabel, "Abrir comprobante oficial");
+  assert.equal(model.downloadLabel, "Abrir comprobante");
   assert.equal(model.returnToDebtsHref, "/deuda/electro-norte?customerRef=778899");
   assert.equal(model.detailItems[0].value, "Electro Norte");
   assert.equal(model.detailItems[2].value, "ENERGIA-HOGAR");

@@ -6,7 +6,80 @@ import {
   getAdminDebtsUrl,
   getProviderCustomerDebts,
   listProviderDebts,
+  searchDebtsLookup,
 } from "./deudasApi.js";
+
+test("searchDebtsLookup maps 404 responses to a typed error", async () => {
+  globalThis.window = {
+    location: {
+      origin: "http://localhost:5173",
+    },
+  };
+
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        success: false,
+        message: "No se encontraron deudas pendientes para los datos proporcionados",
+      }),
+      {
+        status: 404,
+        headers: {
+          "content-type": "application/json",
+        },
+      },
+    );
+
+  await assert.rejects(
+    async () => searchDebtsLookup("1", "agua-residencial", "1234567"),
+    (error) => {
+      assert.equal(error.status, 404);
+      assert.match(error.message, /deudas pendientes/i);
+      return true;
+    },
+  );
+});
+
+test("searchDebtsLookup returns pending debts from lookup payload", async () => {
+  globalThis.window = {
+    location: {
+      origin: "http://localhost:5173",
+    },
+  };
+
+  globalThis.fetch = async (url) => {
+    assert.equal(
+      url,
+      "/debts/lookup?tenantId=1&serviceId=agua-residencial&customerRef=1234567",
+    );
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: [
+          {
+            id: "7",
+            serviceId: "prueba2",
+            period: "2030-12",
+            amount: 500,
+            status: "PENDING",
+          },
+        ],
+      }),
+      {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+        },
+      },
+    );
+  };
+
+  const debts = await searchDebtsLookup("1", "agua-residencial", "1234567");
+
+  assert.equal(debts.length, 1);
+  assert.equal(debts[0].serviceId, "prueba2");
+});
 
 test("getProviderCustomerDebts preserves customerRef characters accepted by lookup", async () => {
   let requestUrl = null;

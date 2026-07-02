@@ -4,6 +4,7 @@ const cors = require("cors");
 const { registerHealthRoutes } = require("./src/api/routes/health.routes");
 const { registerPublicDebtRoutes } = require("./src/api/routes/public-debts.routes");
 const { registerAdminDebtRoutes } = require("./src/api/routes/admin-debts.routes");
+const { registerAdminProviderRoutes } = require("./src/api/routes/admin-providers.routes");
 const {
   mapAdminDebt,
   mapProvider,
@@ -27,6 +28,7 @@ function createApp({ prismaClient, adminDebtRoutesOptions = {} }) {
   registerPublicDebtRoutes(app, { prismaClient });
   // Permite inyectar middleware alternativo en tests sin duplicar el wiring real.
   registerAdminDebtRoutes(app, { prismaClient, ...adminDebtRoutesOptions });
+  registerAdminProviderRoutes(app, { prismaClient, ...adminDebtRoutesOptions });
 
   return app;
 }

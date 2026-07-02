@@ -5,6 +5,8 @@ function mapProvider(provider) {
     description: provider.description,
     image: provider.image_url,
     idProveedor: provider.tenant_id,
+    tenantId: provider.tenant_id,
+    active: provider.active,
   };
 }
 

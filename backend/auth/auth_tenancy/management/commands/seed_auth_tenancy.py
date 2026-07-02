@@ -4,8 +4,17 @@ from django.core.management.base import BaseCommand
 from auth_tenancy.infrastructure.persistence.models import CompanyModel, MembershipModel
 
 
+DEMO_COMPANIES = [
+    {"id": 1, "name": "Nur", "nit": "NIT-NUR-001"},
+    {"id": 2, "name": "Saguapac", "nit": "NIT-SAG-002"},
+    {"id": 3, "name": "Cre", "nit": "NIT-CRE-003"},
+    {"id": 4, "name": "Colegio Marista", "nit": "NIT-MAR-004"},
+    {"id": 6, "name": "Tigo", "nit": "NIT-TIGO-006"},
+]
+
+
 class Command(BaseCommand):
-    help = "Creates demo users, companies and memberships for the auth & tenancy module."
+    help = "Creates demo users, companies and memberships aligned with catalog/deudas tenant IDs."
 
     def handle(self, *args, **options):
         user_model = get_user_model()
@@ -31,47 +40,25 @@ class Command(BaseCommand):
         provider.set_password("provider123")
         provider.save()
 
-        customer, _ = user_model.objects.get_or_create(
-            email="user@multipagos.dev",
-            defaults={
-                "username": "user",
-                "global_role": "user",
-            },
-        )
-        customer.set_password("user12345")
-        customer.save()
+        for company_data in DEMO_COMPANIES:
+            CompanyModel.objects.update_or_create(
+                id=company_data["id"],
+                defaults={
+                    "name": company_data["name"],
+                    "nit": company_data["nit"],
+                    "fiscal_address": f"Sede {company_data['name']}",
+                    "status": "APPROVED",
+                    "active": True,
+                    "is_public": True,
+                },
+            )
 
-        water_company, _ = CompanyModel.objects.get_or_create(
-            nit="900001",
-            defaults={
-                "name": "Cooperativa de Agua",
-                "fiscal_address": "Av. Agua 100",
-                "status": "APPROVED",
-            },
-        )
-        energy_company, _ = CompanyModel.objects.get_or_create(
-            nit="900002",
-            defaults={
-                "name": "Empresa Eléctrica",
-                "fiscal_address": "Av. Energía 200",
-                "status": "APPROVED",
-            },
-        )
+        nur = CompanyModel.objects.get(id=1)
 
         MembershipModel.objects.get_or_create(
             user=provider,
-            company=water_company,
+            company=nur,
             defaults={"company_role": "provider", "active": True},
-        )
-        MembershipModel.objects.get_or_create(
-            user=customer,
-            company=water_company,
-            defaults={"company_role": "operator", "active": True},
-        )
-        MembershipModel.objects.get_or_create(
-            user=provider,
-            company=energy_company,
-            defaults={"company_role": "manager", "active": True},
         )
 
         self.stdout.write(self.style.SUCCESS("Demo auth & tenancy data created successfully."))

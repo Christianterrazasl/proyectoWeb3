@@ -69,27 +69,60 @@ app.use(
   proxy("http://reportes:3000", { "^/": "/api/admin/audit-logs/" }),
 );
 
-// Catálogo (Protegido y Público)
+// Deudas admin (debe ir ANTES del catch-all /api/admin del catálogo)
+app.use(
+  "/api/admin/debts",
+  proxy("http://deudas:3000", { "^/": "/admin/debts/" }),
+);
+app.use(
+  "/api/admin/providers",
+  proxy("http://deudas:3000", { "^/": "/admin/providers/" }),
+);
+
+// Catálogo admin (rutas explícitas antes del catch-all)
+app.use(
+  "/api/admin/companies",
+  proxy("http://catalogo:3000", { "^/api/admin/companies": "/api/companies" }),
+);
+app.use(
+  "/api/admin/services",
+  proxy("http://catalogo:3000", { "^/api/admin/services": "/api/services" }),
+);
+
+// Catálogo admin
 app.use(
   "/api/admin",
   proxy("http://catalogo:3000", { "^/": "/api/admin/" }),
 );
+
+// Catálogo público
 app.use(
-  "/api/catalog",
-  proxy("http://catalogo:3000", { "^/": "/api/" }),
+  createProxyMiddleware({
+    target: "http://catalogo:3000",
+    changeOrigin: true,
+    pathFilter: (pathname) => pathname.startsWith("/api/catalog"),
+    pathRewrite: (path) => path.replace(/^\/api\/catalog/, "/api"),
+  }),
 );
 
 // Pagos
 app.use(
   "/api/payments",
-  proxy("http://pagos:3000", { "^/": "/api/payments/" }),
+  createProxyMiddleware({
+    target: "http://pagos:3000",
+    changeOrigin: true,
+    pathRewrite: { "^/": "/api/payments/" },
+    onProxyRes(proxyRes) {
+      const contentType = proxyRes.headers["content-type"] || "";
+
+      if (contentType.startsWith("text/html") && !contentType.includes("charset=")) {
+        proxyRes.headers["content-type"] = "text/html; charset=utf-8";
+      }
+    },
+  }),
 );
 
-// Deudas (Protegido y Público)
-app.use(
-  "/api/admin/debts",
-  proxy("http://deudas:3000", { "^/": "/admin/debts/" }),
-);
+// Deudas públicas
 app.use("/debts", proxy("http://deudas:3000", { "^/": "/debts/" }));
 
 // Inicialización

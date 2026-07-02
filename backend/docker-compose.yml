@@ -190,7 +190,7 @@ services:
     environment:
       SECRET_KEY: multipagos-pagos-dev-secret-key
       DEBUG: "true"
-      ALLOWED_HOSTS: localhost,127.0.0.1,pagos,gateway
+      ALLOWED_HOSTS: localhost,127.0.0.1,pagos,pagos:3000,gateway
       POSTGRES_DB: multipagos_pagos
       POSTGRES_USER: multipagos
       POSTGRES_PASSWORD: multipagos

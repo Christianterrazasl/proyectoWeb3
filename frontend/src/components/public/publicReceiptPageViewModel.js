@@ -72,16 +72,14 @@ export function buildPublicReceiptPageModel({
   const debt = selectedDebt || {};
 
   return {
-    title: "Comprobante listo para compartir",
-    description:
-      "Tu pago fue procesado dentro del portal público. Revisa el resumen final, conserva este identificador y abre el comprobante oficial si necesitas compartirlo o descargarlo.",
+    title: "Comprobante de pago",
     receiptLabel:
       normalizeText(receiptHash, "") ||
       normalizeText(paymentData.receipt_hash, "") ||
       normalizeText(transactionId, "Sin comprobante"),
     statusLabel: resolveStatusLabel(paymentData.status),
     canOpenOfficialReceipt: String(paymentData.status || "").toUpperCase() === "SUCCESS",
-    downloadLabel: "Abrir comprobante oficial",
+    downloadLabel: "Abrir comprobante",
     returnToDebtsHref: buildReturnToDebtsHref(providerId, customerRef),
     detailItems: [
       {

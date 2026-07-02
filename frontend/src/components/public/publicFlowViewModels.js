@@ -35,18 +35,14 @@ function formatPeriodsRange(debts) {
 
 const CATALOG_LOADING_STATE = {
   variant: "loading",
-  title: "Cargando empresas disponibles",
-  description:
-    "Estamos consultando el catálogo público actual para mostrarte las empresas y servicios habilitados.",
+  title: "Cargando empresas",
 };
 
-const CATALOG_ERROR_TITLE = "No se pudo cargar el catálogo público";
+const CATALOG_ERROR_TITLE = "Error al cargar el catálogo";
 
 const CATALOG_EMPTY_STATE = {
   variant: "empty",
-  title: "No encontramos coincidencias",
-  description:
-    "Prueba con otro nombre, servicio o categoría para continuar con la consulta pública.",
+  title: "Sin resultados",
 };
 
 export function buildPublicCatalogBrowserState({
@@ -223,9 +219,7 @@ export function buildPublicResultsSummary({
   );
 
   return {
-    title: `Encontramos ${debts.length} deudas pendientes`,
-    description:
-      "Valida empresa, referencia y periodos antes de pasar al detalle de deudas y al pago QR.",
+    title: `Encontramos ${debts.length} deuda(s)`,
     totalAmountLabel: `Bs. ${totalAmount.toFixed(2)}`,
     detailItems: [
       { key: "company", label: "Empresa", value: companyName || "Sin empresa" },

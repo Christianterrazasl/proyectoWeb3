@@ -164,9 +164,10 @@ class PaymentWriteViewsTests(SimpleTestCase):
         response = DownloadReceiptView.as_view()(request, transaction_id='txn-10')
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response['Content-Type'], 'text/html')
-        content = response.content.decode('utf-8')
-        self.assertIn('Comprobante de Transacción Exitosa', content)
+        self.assertIn("charset=utf-8", response["Content-Type"])
+        content = response.content.decode("utf-8")
+        self.assertIn("Comprobante de pago", content)
+        self.assertIn("Transacción exitosa", content)
         self.assertIn('RCPT-OK', content)
         self.assertIn('txn-10', content)
         self.assertIn('9988', content)

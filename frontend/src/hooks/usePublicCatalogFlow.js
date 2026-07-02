@@ -169,13 +169,13 @@ export function usePublicCatalogFlow() {
 
       try {
         const results = await searchDebtsLookup(
-          selectedService.companyId,
+          String(selectedService.companyId ?? selectedCompany?.id ?? ""),
           selectedService.id,
           normalizedCustomerRef,
         );
         setDebts(results);
       } catch (err) {
-        if (err.status === 404) {
+        if (err?.status === 404) {
           setLookupNotice(err.message || "No tienes deudas pendientes");
         } else {
           setLookupError(err.message || "Error en la búsqueda.");
@@ -184,7 +184,7 @@ export function usePublicCatalogFlow() {
         setLoadingSearch(false);
       }
     },
-    [normalizedCustomerRef, selectedService],
+    [normalizedCustomerRef, selectedCompany?.id, selectedService],
   );
 
   return {

@@ -97,3 +97,74 @@ export async function getMeRequest(accessToken) {
     throw error;
   }
 }
+
+export async function listCompaniesRequest(accessToken) {
+  const response = await fetch(
+    AUTH_API_ROUTES.companies,
+    buildAuthenticatedRequestInit({
+      method: "GET",
+      accessToken,
+      companyId: null,
+    }),
+  );
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, "No se pudieron cargar las empresas"));
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createCompanyRequest(
+  accessToken,
+  { name, nit, fiscal_address, logo_url, description, category },
+) {
+  const response = await fetch(
+    AUTH_API_ROUTES.companies,
+    buildAuthenticatedRequestInit({
+      method: "POST",
+      accessToken,
+      companyId: null,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name,
+        nit,
+        fiscal_address,
+        logo_url,
+        description,
+        category,
+      }),
+    }),
+  );
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, "No se pudo crear la empresa"));
+  }
+
+  return data;
+}
+
+export async function deleteCompanyRequest(accessToken, companyId) {
+  const response = await fetch(
+    `${AUTH_API_ROUTES.companies}${companyId}/`,
+    buildAuthenticatedRequestInit({
+      method: "DELETE",
+      accessToken,
+      companyId: null,
+    }),
+  );
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, "No se pudo eliminar la empresa"));
+  }
+
+  return data;
+}

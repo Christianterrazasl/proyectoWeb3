@@ -138,6 +138,71 @@ test("POST /debts/lookup returns active providers with pending debts for the cus
   });
 });
 
+test("GET /debts/lookup falls back to tenant debts when serviceId does not match", async () => {
+  const debtQueries = [];
+
+  const app = createApp({
+    prismaClient: {
+      provider: {
+        findMany: async () => [],
+        findUnique: async () => null,
+      },
+      debt: {
+        findMany: async (query) => {
+          debtQueries.push(query);
+
+          if (query.where.service_id) {
+            return [];
+          }
+
+          return [
+            {
+              id: 7,
+              tenant_id: "1",
+              customer_ref: "1234567",
+              service_id: "prueba2",
+              period: "2030-12",
+              amount: 500,
+              due_date: new Date("2030-12-12T00:00:00.000Z"),
+              status: "PENDING",
+            },
+          ];
+        },
+      },
+    },
+  });
+
+  const response = await request(app).get("/debts/lookup").query({
+    tenantId: "1",
+    serviceId: "agua-residencial",
+    customerRef: "1234567",
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(debtQueries.length, 2);
+  assert.deepEqual(debtQueries[0].where, {
+    tenant_id: "1",
+    customer_ref: "1234567",
+    status: "PENDING",
+    service_id: "agua-residencial",
+  });
+  assert.deepEqual(debtQueries[1].where, {
+    tenant_id: "1",
+    customer_ref: "1234567",
+    status: "PENDING",
+  });
+  assert.deepEqual(response.body.data, [
+    {
+      id: "7",
+      serviceId: "prueba2",
+      period: "2030-12",
+      amount: 500,
+      dueDate: "2030-12-12T00:00:00.000Z",
+      status: "PENDING",
+    },
+  ]);
+});
+
 test("POST /debts/lookup rejects requests without customerRef", async () => {
   const app = createApp({
     prismaClient: {

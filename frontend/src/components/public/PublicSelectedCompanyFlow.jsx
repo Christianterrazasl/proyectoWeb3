@@ -39,13 +39,12 @@ const PublicSelectedCompanyFlow = ({
           onClick={onBack}
           className="mb-6 flex cursor-pointer items-center gap-2 text-sm font-medium text-cyan-400 transition-colors hover:text-cyan-300"
         >
-          <FaArrowLeft /> Volver a empresas disponibles
+          <FaArrowLeft /> Volver
         </button>
 
         <PublicSelectedCompanyHero
           category={selectedCompany.category}
           companyName={selectedCompany.name}
-          description={selectedCompany.description}
           servicesCount={selectedCompany.services.length}
         />
       </div>
@@ -65,12 +64,9 @@ const PublicSelectedCompanyFlow = ({
           inputPlaceholder={inputPlaceholder}
           onCustomerRefChange={onCustomerRefChange}
           onSubmit={onSearch}
-          selectedServiceName={selectedService?.name}
           selectedServiceEnabled={Boolean(selectedService)}
           canSearch={canSearch}
           loadingSearch={loadingSearch}
-          companyName={selectedCompany.name}
-          normalizedCustomerRef={normalizedCustomerRef}
         />
       </div>
 

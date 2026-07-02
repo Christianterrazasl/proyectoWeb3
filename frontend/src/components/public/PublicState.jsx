@@ -5,7 +5,6 @@ import {
   FiAlertCircle,
   FiCheckCircle,
   FiInbox,
-  FiInfo,
 } from "react-icons/fi";
 
 const VARIANT_STYLES = {
@@ -31,7 +30,7 @@ const VARIANT_STYLES = {
     containerClassName: "border-white/10 bg-white/[0.04] text-slate-100",
   },
   info: {
-    icon: FiInfo,
+    icon: FiCheckCircle,
     iconClassName: "text-cyan-300",
     containerClassName: "border-cyan-400/20 bg-cyan-500/10 text-cyan-100",
   },
@@ -42,20 +41,16 @@ const PublicState = ({ variant = "info", title, description }) => {
   const Icon = state.icon;
 
   return (
-    <article className="lumina-shell flex min-h-[220px] items-center justify-center">
+    <article className="lumina-shell flex min-h-[180px] items-center justify-center">
       <div
-        className={`w-full rounded-[24px] border px-6 py-8 text-center shadow-[0_20px_80px_rgba(15,23,42,0.2)] ${state.containerClassName}`}
+        className={`w-full rounded-[24px] border px-6 py-8 text-center ${state.containerClassName}`}
       >
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-slate-950/35 text-2xl">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center text-2xl">
           <Icon className={state.iconClassName} />
         </div>
-
-        <h3 className="mt-5 text-xl font-semibold text-slate-100">{title}</h3>
-
+        <h3 className="mt-4 text-lg font-semibold text-slate-100">{title}</h3>
         {description ? (
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-            {description}
-          </p>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-slate-200">{description}</p>
         ) : null}
       </div>
     </article>

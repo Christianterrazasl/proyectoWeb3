@@ -12,7 +12,7 @@ const CompanyGrid = ({ companies, onSelectCompany }) => {
         >
           <div className="flex items-start justify-between gap-4">
             <div>
-              <span className="lumina-chip">{company.category || "Catálogo público"}</span>
+              <span className="lumina-chip">{company.category || "Servicios"}</span>
               <h3 className="mt-4 text-lg font-semibold text-slate-100">
                 {company.name}
               </h3>
@@ -23,14 +23,9 @@ const CompanyGrid = ({ companies, onSelectCompany }) => {
             </div>
           </div>
 
-          <p className="mt-4 flex-1 text-sm leading-6 text-slate-400">
-            {company.description ||
-              "Selecciona esta empresa para revisar sus servicios públicos disponibles."}
-          </p>
-
           <div className="mt-5 flex items-center gap-2 text-sm text-cyan-300">
             <FiLayers />
-            <span>{company.services?.length || 0} servicio(s) disponible(s)</span>
+            <span>{company.services?.length || 0} servicio(s)</span>
           </div>
         </button>
       ))}

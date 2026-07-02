@@ -43,4 +43,6 @@ main().catch((error) => {
 });
 NODE
 
+node src/infrastructure/seed/catalogSeed.js
+
 exec npm start

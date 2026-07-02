@@ -140,18 +140,28 @@ function registerPublicDebtRoutes(app, { prismaClient }) {
     }
 
     try {
-      // Modificado a findMany para soportar múltiples deudas (ej. 2 facturas de agua pendientes)
-      const debts = await prismaClient.debt.findMany({
+      const baseWhere = {
+        tenant_id: tenantId,
+        customer_ref: customerRef,
+        status: "PENDING",
+      };
+
+      let debts = await prismaClient.debt.findMany({
         where: {
-          tenant_id: tenantId,
+          ...baseWhere,
           service_id: serviceId,
-          customer_ref: customerRef,
-          status: "PENDING",
         },
         orderBy: { due_date: "asc" },
       });
 
-      if (!debts || debts.length === 0) {
+      if (!debts.length) {
+        debts = await prismaClient.debt.findMany({
+          where: baseWhere,
+          orderBy: { due_date: "asc" },
+        });
+      }
+
+      if (!debts.length) {
         return res.status(404).json({
           success: false,
           message:

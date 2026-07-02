@@ -12,6 +12,7 @@ from ..domain.shared.core.business_rule_validation_exception import BusinessRule
 from ..application.commands import CreateTransactionCommandHandler, ConfirmPaymentCommandHandler, DebtSyncPendingError
 from ..application.queries import GetTransactionQueryHandler, ListTransactionsQueryHandler
 from .auth import CustomJWTAuthentication
+from .receipt_html import render_receipt_html
 from ..infrastructure.repositories_impl import TransactionRepositoryImpl
 from ..infrastructure.rabbitmq_publisher import RabbitMQEventPublisher
 
@@ -168,44 +169,16 @@ class DownloadReceiptView(APIView):
         transaction = handler.execute(transaction_id)
 
         if not transaction or transaction.get("status") != "SUCCESS":
-            return HttpResponse("<h1>Comprobante no disponible o pago no exitoso.</h1>", status=404)
+            body = (
+                "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"UTF-8\" />"
+                "<title>Comprobante no disponible</title></head><body>"
+                "<h1>Comprobante no disponible o pago no exitoso.</h1></body></html>"
+            ).encode("utf-8")
+            return HttpResponse(body, status=404, content_type="text/html; charset=utf-8")
 
-        html_content = f"""
-        <html>
-        <head>
-            <title>Comprobante de Pago</title>
-            <style>
-                body {{ font-family: 'Arial', sans-serif; background-color: #f4f4f9; padding: 40px; }}
-                .receipt-box {{ max-width: 600px; margin: auto; background: white; padding: 30px; 
-                                border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-top: 5px solid #4CAF50; }}
-                .header {{ text-align: center; border-bottom: 1px solid #ddd; padding-bottom: 20px; }}
-                .header h1 {{ color: #4CAF50; margin: 0; }}
-                .details {{ margin-top: 20px; font-size: 16px; line-height: 1.6; }}
-                .details span {{ font-weight: bold; color: #333; }}
-                .amount {{ font-size: 24px; text-align: center; color: #2c3e50; font-weight: bold; margin: 30px 0; }}
-                .footer {{ text-align: center; font-size: 12px; color: #888; margin-top: 40px; }}
-            </style>
-        </head>
-        <body>
-            <div class="receipt-box">
-                <div class="header">
-                    <h1>Multipagos QR</h1>
-                    <p>Comprobante de Transacción Exitosa</p>
-                </div>
-                <div class="amount">Total Pagado: Bs. {transaction.get('amount')}</div>
-                <div class="details">
-                    <p><span>Recibo ID:</span> {transaction.get('receipt_hash')}</p>
-                    <p><span>Transacción ID:</span> {transaction.get('id')}</p>
-                    <p><span>Código Cliente:</span> {transaction.get('customer_ref')}</p>
-                    <p><span>Fecha de Pago:</span> {transaction.get('created_at')}</p>
-                    <p><span>Empresa Destino (Tenant):</span> {transaction.get('tenant_id')}</p>
-                </div>
-                <div class="footer">
-                    Este documento es un comprobante válido generado electrónicamente.<br>
-                    Gracias por utilizar Multipagos QR.
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        return HttpResponse(html_content, content_type="text/html")
+        response = HttpResponse(
+            render_receipt_html(transaction),
+            content_type="text/html; charset=utf-8",
+        )
+        response.charset = "utf-8"
+        return response

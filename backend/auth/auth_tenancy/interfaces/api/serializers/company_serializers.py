@@ -8,6 +8,8 @@ class CreateCompanySerializer(serializers.Serializer):
     nit = serializers.CharField(max_length=30)
     fiscal_address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     logo_url = serializers.URLField(required=False, allow_blank=True, allow_null=True)
+    description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    category = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=100)
 
 
 class UpdateCompanySerializer(serializers.Serializer):

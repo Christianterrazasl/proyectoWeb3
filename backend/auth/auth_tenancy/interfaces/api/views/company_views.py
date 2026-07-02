@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from auth_tenancy.application.commands import (
     ChangeCompanyStatusCommand,
     CreateCompanyCommand,
+    DeleteCompanyCommand,
     UpdateCompanyCommand,
 )
 from auth_tenancy.application.queries import GetCompanyDetailQuery, ListCompaniesQuery
@@ -10,9 +11,11 @@ from auth_tenancy.interfaces.api.dependencies import (
     get_change_company_status_handler,
     get_company_detail_handler,
     get_create_company_handler,
+    get_delete_company_handler,
     get_list_companies_handler,
     get_update_company_handler,
 )
+from auth_tenancy.infrastructure.persistence.models import CompanyModel
 from auth_tenancy.interfaces.api.permissions import IsAdmin
 from auth_tenancy.interfaces.api.serializers import (
     ChangeCompanyStatusSerializer,
@@ -60,6 +63,8 @@ class CompanyListCreateView(BaseApiView):
                     nit=serializer.validated_data["nit"],
                     fiscal_address=serializer.validated_data.get("fiscal_address"),
                     logo_url=serializer.validated_data.get("logo_url"),
+                    description=serializer.validated_data.get("description"),
+                    category=serializer.validated_data.get("category"),
                 )
             )
             return self.success_response(result, status_code=201)
@@ -69,7 +74,7 @@ class CompanyListCreateView(BaseApiView):
 
 class CompanyDetailView(BaseApiView):
     def get_permissions(self):
-        if self.request.method == "PATCH":
+        if self.request.method in {"PATCH", "DELETE"}:
             return [IsAuthenticated(), IsAdmin()]
         return [IsAuthenticated()]
 
@@ -104,6 +109,21 @@ class CompanyDetailView(BaseApiView):
                     fiscal_address=serializer.validated_data.get("fiscal_address"),
                     logo_url=serializer.validated_data.get("logo_url"),
                     active=serializer.validated_data["active"],
+                )
+            )
+            return self.success_response(result)
+        except Exception as error:
+            return self.handle_domain_exception(error)
+
+    def delete(self, request, company_id: int):
+        handler = get_delete_company_handler()
+
+        try:
+            result = handler.handle(
+                DeleteCompanyCommand(
+                    actor_id=request.user.id,
+                    actor_role=request.user.global_role,
+                    company_id=company_id,
                 )
             )
             return self.success_response(result)

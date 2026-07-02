@@ -9,3 +9,5 @@ class CreateCompanyCommand:
     nit: str
     fiscal_address: str | None = None
     logo_url: str | None = None
+    description: str | None = None
+    category: str | None = None

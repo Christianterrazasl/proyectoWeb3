@@ -1,17 +1,15 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
-import { getDefaultRouteForUser, isAdminRole, isProviderRole } from "../utils/roleRouting";
+import { getDefaultRouteForUser, isAdminRole, isProviderRole, isStaffRole } from "../utils/roleRouting";
 
-const ProtectedRoute = ({ children, requireAdmin = false, requireProvider = false, blockAdmin = false }) => {
+const ProtectedRoute = ({ children, requireAdmin = false, requireProvider = false }) => {
   const { isAuthenticated, isBootstrapping, user } = useAuth();
 
-  // El guard espera el bootstrap porque la sesión válida depende de reconstruir /me, no solo de leer tokens.
   if (isBootstrapping) {
     return (
       <div className="lumina-page flex min-h-screen items-center justify-center px-6">
-        <div className="lumina-card rounded-3xl px-6 py-5 text-center">
-          <p className="lumina-label text-cyan-300">Cargando sesión</p>
-          <p className="mt-3 text-sm text-slate-300">Validando acceso seguro...</p>
+        <div className="lumina-shell text-center">
+          <p className="text-sm text-slate-200">Cargando...</p>
         </div>
       </div>
     );
@@ -21,7 +19,10 @@ const ProtectedRoute = ({ children, requireAdmin = false, requireProvider = fals
     return <Navigate to="/login" replace />;
   }
 
-  // El guard solo decide acceso; la resolución de rol vive en la utilidad compartida.
+  if (!isStaffRole(user)) {
+    return <Navigate to="/" replace />;
+  }
+
   const userIsAdmin = isAdminRole(user);
   const userIsProvider = isProviderRole(user);
 
@@ -31,10 +32,6 @@ const ProtectedRoute = ({ children, requireAdmin = false, requireProvider = fals
 
   if (requireProvider && !userIsProvider) {
     return <Navigate to={getDefaultRouteForUser(user)} replace />;
-  }
-
-  if (blockAdmin && userIsAdmin) {
-    return <Navigate to="/admin" replace />;
   }
 
   return children;

@@ -11,61 +11,15 @@ const PublicDebtSelectionPanel = ({
   return (
     <article className="lumina-shell">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="lumina-label text-cyan-300">Deudas disponibles</p>
-          <h2 className="lumina-title mt-3 text-slate-100">
-            Revisa y selecciona qué obligación deseas pagar
-          </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-            {selectionModel.headerDescription}
-          </p>
-        </div>
+        <h2 className="lumina-title text-slate-100">Deudas</h2>
 
-        <div className="rounded-[24px] border border-cyan-400/20 bg-cyan-500/10 px-5 py-4 sm:w-max lg:min-w-[220px]">
+        <div className="rounded-[24px] border border-cyan-400/20 bg-cyan-500/10 px-5 py-4 sm:w-max">
           <p className="text-xs uppercase tracking-[0.18em] text-cyan-100/80">
-            Total pendiente
+            Total
           </p>
           <p className="mt-2 text-2xl font-bold text-white">
             {selectionModel.totalPendingLabel}
           </p>
-          <p className="mt-2 text-xs uppercase tracking-[0.18em] text-cyan-200/75">
-            {deudas.length} obligación(es)
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-6 rounded-[24px] border border-cyan-300/15 bg-cyan-300/[0.05] p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-cyan-100">
-              {selectionModel.headerTitle}
-            </p>
-            <p className="mt-2 text-sm text-cyan-300/80">
-              {selectionModel.nextStepLabel}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-cyan-300/20 bg-slate-950/35 px-4 py-3 sm:w-max">
-            <p className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">
-              Pago actual
-            </p>
-            <p className="mt-2 text-xl font-semibold text-white">
-              {selectionModel.selectedAmountLabel}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {selectionModel.summaryItems.map((item) => (
-            <div key={item.key} className="lumina-metric-card">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-200/75">
-                {item.label}
-              </p>
-              <p className="mt-2 text-sm font-semibold text-slate-100">
-                {item.value}
-              </p>
-            </div>
-          ))}
         </div>
       </div>
 
@@ -90,17 +44,11 @@ const PublicDebtSelectionPanel = ({
                     <p className="mt-4 text-lg font-semibold text-slate-100">
                       {deuda.serviceId}
                     </p>
-                    <p className="mt-2 text-sm text-slate-400">
-                      Estado actual: {deuda.status}
-                    </p>
                   </div>
                   <div className="text-left lg:text-right">
                     <p className="lumina-label text-cyan-300">Monto</p>
                     <p className="mt-3 text-2xl font-semibold text-slate-100">
                       {formatAmount(deuda.amount)}
-                    </p>
-                    <p className="mt-2 text-sm text-slate-400">
-                      ID: {deuda.id}
                     </p>
                   </div>
                 </div>

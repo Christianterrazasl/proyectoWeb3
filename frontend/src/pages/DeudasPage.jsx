@@ -1,15 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import {
-  FiArrowLeft,
-  FiFileText,
-  FiShield,
-} from "react-icons/fi";
+import { FiArrowLeft, FiFileText } from "react-icons/fi";
 import { getProviderCustomerDebts } from "../services/deudasApi";
-import {
-  confirmPayment,
-  createPaymentQr,
-} from "../services/pagosApi";
+import { confirmPayment, createPaymentQr } from "../services/pagosApi";
 import PublicDebtPaymentPanel from "../components/public/PublicDebtPaymentPanel.jsx";
 import PublicDebtSelectionPanel from "../components/public/PublicDebtSelectionPanel.jsx";
 import PublicState from "../components/public/PublicState.jsx";
@@ -20,7 +13,7 @@ import {
 } from "../components/public/publicPaymentFlowViewModels.js";
 
 function formatDate(value) {
-  if (!value) return "Sin fecha";
+  if (!value) return "—";
 
   const normalizedValue = String(value).trim();
   const dateOnlyMatch = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -70,7 +63,7 @@ const DeudasPage = () => {
     async ({ showPageError = true } = {}) => {
       if (!idProveedor || !customerRef) {
         if (showPageError) {
-          setError("Faltan datos para consultar las deudas del cliente.");
+          setError("Faltan datos para consultar las deudas.");
         }
         setProvider(null);
         setDeudas([]);
@@ -201,7 +194,7 @@ const DeudasPage = () => {
       } catch (refreshError) {
         refreshNotice =
           refreshError.message ||
-          "El pago se confirmó, pero no se pudo refrescar la lista de deudas.";
+          "El pago se confirmó, pero no se pudo refrescar la lista.";
       }
 
       navigate(
@@ -239,45 +232,24 @@ const DeudasPage = () => {
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
         <section className="lumina-shell">
-          <div className="flex flex-col gap-6">
-            <Link
-              to="/"
-              className="inline-flex w-max items-center gap-2 text-sm font-medium text-cyan-400 transition-colors hover:text-cyan-300"
-            >
-              <FiArrowLeft />
-              Volver al portal público
-            </Link>
+          <Link
+            to="/"
+            className="inline-flex w-max items-center gap-2 text-sm font-medium text-cyan-400 transition-colors hover:text-cyan-300"
+          >
+            <FiArrowLeft />
+            Volver
+          </Link>
 
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="lumina-chip">Consulta pública</span>
-                  <span className="lumina-chip">Detalle de deudas</span>
-                </div>
+          <h1 className="lumina-headline mt-4 text-slate-100">
+            {provider?.name || "Deudas"}
+          </h1>
 
-                <h1 className="lumina-headline mt-4 text-slate-100">
-                  {provider?.name || "Detalle de deudas del cliente"}
-                </h1>
-
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-                  Revisa la misma experiencia pública de punta a punta: valida
-                  las obligaciones pendientes, elige qué periodo pagar y continúa
-                  al QR sin salir del flujo.
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[420px]">
-                <div className="lumina-inline-stat">
-                  <FiFileText className="text-cyan-300" /> Cliente:{" "}
-                  {customerRef || "Sin referencia"}
-                </div>
-                <div className="lumina-inline-stat">
-                  <FiShield className="text-cyan-300" /> Proveedor:{" "}
-                  {provider?.name || idProveedor}
-                </div>
-              </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <div className="lumina-inline-stat">
+              <FiFileText className="text-cyan-300" /> {customerRef || "—"}
             </div>
           </div>
+
           <div className="mt-6">
             <PublicFlowSteps currentStep={3} />
           </div>
@@ -285,48 +257,31 @@ const DeudasPage = () => {
 
         <section className="mt-6 flex-1">
           {loading ? (
-            <PublicState
-              variant="loading"
-              title="Cargando sus deudas..."
-              description="Estamos procesando su solicitud. Por favor, espere un momento."
-            />
+            <PublicState variant="loading" title="Cargando deudas..." />
           ) : error ? (
-            <PublicState
-              variant="error"
-              title="Error al cargar las deudas"
-              description={error}
-            />
+            <PublicState variant="error" title="Error" description={error} />
           ) : (
             <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
               {deudas.length > 0 ? (
-                  <PublicDebtSelectionPanel
-                    deudas={deudas}
-                    selectedDeudaId={selectedDeudaId}
-                    selectionModel={selectionModel}
-                    formatAmount={formatAmount}
-                    formatDate={formatDate}
-                    onSelectDebt={(debtId) => {
-                      setSelectedDeudaId(debtId);
-                      resetPayment();
-                    }}
-                  />
+                <PublicDebtSelectionPanel
+                  deudas={deudas}
+                  selectedDeudaId={selectedDeudaId}
+                  selectionModel={selectionModel}
+                  formatAmount={formatAmount}
+                  formatDate={formatDate}
+                  onSelectDebt={(debtId) => {
+                    setSelectedDeudaId(debtId);
+                    resetPayment();
+                  }}
+                />
               ) : (
-                <article className="lumina-shell">
-                  <div className="mt-6 rounded-[24px] border border-cyan-400/15 bg-cyan-500/10 px-6 py-8 text-center">
-                    <p className="text-lg font-semibold text-slate-100">
-                      No hay deudas pendientes.
-                    </p>
-                    <p className="mt-2 text-sm text-slate-400">
-                      Las referencias de este cliente no tienen obligaciones
-                      pendientes con este proveedor.
-                    </p>
-                    <Link
-                      to="/"
-                      className="lumina-button-secondary mt-5 inline-flex cursor-pointer"
-                    >
-                      Volver a la página principal
-                    </Link>
-                  </div>
+                <article className="lumina-shell text-center">
+                  <p className="text-lg font-semibold text-slate-100">
+                    Sin deudas pendientes
+                  </p>
+                  <Link to="/" className="lumina-button-secondary mt-5 inline-flex cursor-pointer">
+                    Inicio
+                  </Link>
                 </article>
               )}
 

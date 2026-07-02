@@ -3,6 +3,7 @@ from auth_tenancy.application.handlers import (
     ChangeCompanyStatusHandler,
     ChangeUserGlobalRoleHandler,
     CreateCompanyHandler,
+    DeleteCompanyHandler,
     GetCompanyDetailHandler,
     GetCurrentUserHandler,
     GetUserDetailHandler,
@@ -29,7 +30,7 @@ def get_register_user_handler() -> RegisterUserHandler:
 
 
 def get_login_user_handler() -> LoginUserHandler:
-    return LoginUserHandler(DjangoUserRepository(), PasswordHasher(), JWTService())
+    return LoginUserHandler(DjangoUserRepository(), PasswordHasher())
 
 
 def get_current_user_handler() -> GetCurrentUserHandler:
@@ -58,6 +59,10 @@ def get_update_company_handler() -> UpdateCompanyHandler:
 
 def get_change_company_status_handler() -> ChangeCompanyStatusHandler:
     return ChangeCompanyStatusHandler(DjangoCompanyRepository(), TenantAccessPolicy())
+
+
+def get_delete_company_handler() -> DeleteCompanyHandler:
+    return DeleteCompanyHandler(DjangoCompanyRepository(), TenantAccessPolicy())
 
 
 def get_list_companies_handler() -> ListCompaniesHandler:

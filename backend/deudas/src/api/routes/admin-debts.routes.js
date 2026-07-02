@@ -113,17 +113,21 @@ function registerAdminDebtRoutes(app, {
 
     try {
       if (payload.data.tenant_id !== undefined) {
-        const providerValidationError = await ensureActiveProviderExists(
-          prismaClient.provider,
-          payload.data.tenant_id,
-        );
+        delete payload.data.tenant_id;
+      }
 
-        if (providerValidationError) {
-          return res.status(400).json({
-            success: false,
-            message: providerValidationError.error,
-          });
-        }
+      const existingDebt = await prismaClient.debt.findFirst({
+        where: {
+          id: debtId,
+          tenant_id: req.tenantId,
+        },
+      });
+
+      if (!existingDebt) {
+        return res.status(404).json({
+          success: false,
+          message: "No se encontró la deuda solicitada",
+        });
       }
 
       const debt = await prismaClient.debt.update({
@@ -170,6 +174,20 @@ function registerAdminDebtRoutes(app, {
     }
 
     try {
+      const existingDebt = await prismaClient.debt.findFirst({
+        where: {
+          id: debtId,
+          tenant_id: req.tenantId,
+        },
+      });
+
+      if (!existingDebt) {
+        return res.status(404).json({
+          success: false,
+          message: "No se encontró la deuda solicitada",
+        });
+      }
+
       const debt = await prismaClient.debt.update({
         where: { id: debtId },
         data: { status },

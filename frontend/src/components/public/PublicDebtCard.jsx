@@ -9,11 +9,8 @@ const PublicDebtCard = ({ debt, serviceName }) => {
         </div>
 
         <div>
-          <p className="text-sm text-slate-300">
-            Servicio: {serviceName || debt.serviceId}
-          </p>
-          <p className="text-sm text-slate-300">
-            Periodo: {debt.period || "N/A"}
+          <p className="text-sm text-slate-200">
+            {serviceName || debt.serviceId} · {debt.period || "—"}
           </p>
           <p className="mt-1 text-lg font-bold text-slate-100">
             Bs. {Number(debt.amount).toFixed(2)}
