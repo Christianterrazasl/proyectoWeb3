@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home.jsx";
 import DeudasPage from "./pages/DeudasPage.jsx";
+import PublicReceiptPage from "./pages/PublicReceiptPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import ProveedorPage from "./pages/ProveedorPage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
@@ -11,6 +12,10 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/deuda/:idProveedor" element={<DeudasPage />} />
+      <Route
+        path="/deuda/:idProveedor/comprobante/:transactionId"
+        element={<PublicReceiptPage />}
+      />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/proveedor" element={
         <ProtectedRoute requireProvider>
