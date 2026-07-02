@@ -1,18 +1,22 @@
 import {
   FiArrowUpRight,
   FiBriefcase,
+  FiCheckCircle,
   FiCreditCard,
   FiGrid,
   FiHome,
   FiLogOut,
+  FiPlusCircle,
   FiRefreshCw,
   FiShield,
   FiTrendingUp,
   FiUsers,
 } from "react-icons/fi";
-import { useEffect, useMemo, useState } from "react";
+import { AiOutlineLoading3Quarters } from "react-icons/ai";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
+import { createProviderDebt, listProviderDebts } from "../services/deudasApi";
 import {
   getAuditLogs,
   getCompanyPortfolioSummary,
@@ -20,7 +24,11 @@ import {
   getServiceKpis,
   getTransactionMonitoring,
 } from "../services/reportesApi";
-import { getAccessToken } from "../utils/authStorage";
+import {
+  buildAdminDebtPayload,
+  filterAdminDebtRows,
+  mapAdminDebtToRow,
+} from "./adminDebtPanelModel";
 import {
   buildTenancyCompanies,
   getActiveCompany,
@@ -153,6 +161,38 @@ function KpiCard({ label, value, detail, icon }) {
   );
 }
 
+function ActiveCompanySelector({ companies, activeCompanyId, onChange }) {
+  if (!companies.length) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
+        Selector tenancy
+      </p>
+      <label className="mt-3 block text-sm text-slate-300" htmlFor="admin-active-company">
+        Cambiá la empresa activa sin salir del dashboard.
+      </label>
+      <select
+        id="admin-active-company"
+        className="lumina-input mt-3"
+        value={activeCompanyId ?? ""}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {companies.map((company) => (
+          <option key={company.id} value={company.id}>
+            {company.name} · ID {company.id}
+          </option>
+        ))}
+      </select>
+      <p className="mt-2 text-xs text-slate-500">
+        El contexto activo se persiste en localStorage y vuelve a filtrar reportes y deudas.
+      </p>
+    </div>
+  );
+}
+
 const AdminPage = () => {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
@@ -161,12 +201,51 @@ const AdminPage = () => {
   const [transactionRows, setTransactionRows] = useState([]);
   const [auditRows, setAuditRows] = useState([]);
   const [dashboardError, setDashboardError] = useState("");
+  const [documento, setDocumento] = useState("");
+  const [concepto, setConcepto] = useState("");
+  const [monto, setMonto] = useState("");
+  const [fecha, setFecha] = useState("");
+  const [debtRows, setDebtRows] = useState([]);
+  const [debtTab, setDebtTab] = useState("pendientes");
+  const [debtFeedback, setDebtFeedback] = useState("");
+  const [debtLoading, setDebtLoading] = useState(false);
+  const [debtSubmitting, setDebtSubmitting] = useState(false);
 
-  const { logout, user, memberships, accessibleCompanies, activeCompanyId } =
-    useAuth();
+  const {
+    logout,
+    user,
+    session,
+    memberships,
+    accessibleCompanies,
+    activeCompanyId,
+    setActiveCompany,
+  } = useAuth();
+
+  const loadAdminDebts = useCallback(async () => {
+    if (!session?.access || !activeCompanyId) {
+      setDebtRows([]);
+      return;
+    }
+
+    setDebtLoading(true);
+
+    try {
+      const rows = await listProviderDebts({
+        accessToken: session.access,
+        companyId: activeCompanyId,
+      });
+      setDebtRows(rows.map(mapAdminDebtToRow));
+      setDebtFeedback("");
+    } catch (error) {
+      setDebtRows([]);
+      setDebtFeedback(error.message || "No se pudieron cargar las deudas");
+    } finally {
+      setDebtLoading(false);
+    }
+  }, [activeCompanyId, session?.access]);
 
   useEffect(() => {
-    const token = getAccessToken();
+    const token = session?.access;
     if (!token) return;
 
     let ignore = false;
@@ -207,7 +286,11 @@ const AdminPage = () => {
     return () => {
       ignore = true;
     };
-  }, [activeCompanyId]);
+  }, [activeCompanyId, session?.access]);
+
+  useEffect(() => {
+    loadAdminDebts();
+  }, [loadAdminDebts]);
 
   const kpiCards = useMemo(
     () => buildKpiCardsFromDashboard(dashboard),
@@ -221,10 +304,57 @@ const AdminPage = () => {
   );
 
   const activeCompany = getActiveCompany(tenancyCompanies, activeCompanyId);
+  const visibleDebtRows = useMemo(
+    () => filterAdminDebtRows(debtRows, debtTab),
+    [debtRows, debtTab],
+  );
 
   const handleLogout = () => {
     logout();
     navigate("/login");
+  };
+
+  const handleCreateDebt = async (event) => {
+    event.preventDefault();
+
+    if (!documento.trim() || !concepto.trim() || !monto || !fecha) {
+      setDebtFeedback("Completa todos los campos para crear la deuda");
+      return;
+    }
+
+    if (!session?.access || !activeCompanyId) {
+      setDebtFeedback("Debes tener una empresa activa antes de cargar deudas");
+      return;
+    }
+
+    setDebtSubmitting(true);
+    setDebtFeedback("");
+
+    try {
+      await createProviderDebt({
+        accessToken: session.access,
+        companyId: activeCompanyId,
+        ...buildAdminDebtPayload({
+          activeCompanyId,
+          documento,
+          concepto,
+          monto,
+          fecha,
+        }),
+      });
+
+      setDocumento("");
+      setConcepto("");
+      setMonto("");
+      setFecha("");
+      setDebtTab("pendientes");
+      setDebtFeedback("Deuda creada correctamente");
+      await loadAdminDebts();
+    } catch (error) {
+      setDebtFeedback(error.message || "No se pudo crear la deuda");
+    } finally {
+      setDebtSubmitting(false);
+    }
   };
 
   const visibleSidebarItems = sidebarItems.filter((item) => {
@@ -396,6 +526,14 @@ const AdminPage = () => {
                 El alcance de empresa activa también filtra los reportes cuando
                 el backend recibe `X-Company-Id`.
               </p>
+
+              <div className="mt-6">
+                <ActiveCompanySelector
+                  companies={tenancyCompanies}
+                  activeCompanyId={activeCompanyId}
+                  onChange={setActiveCompany}
+                />
+              </div>
             </article>
 
             <article className="lumina-shell">
@@ -451,6 +589,17 @@ const AdminPage = () => {
                             : "Disponible"}
                         </span>
                       </div>
+
+                      <div className="mt-4 flex justify-end">
+                        <button
+                          type="button"
+                          className={company.isActiveCompany ? "lumina-button-secondary" : "lumina-button-primary"}
+                          onClick={() => setActiveCompany(company.id)}
+                          disabled={company.isActiveCompany}
+                        >
+                          {company.isActiveCompany ? "Empresa activa" : "Usar empresa"}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -472,6 +621,201 @@ const AdminPage = () => {
             {kpiCards.map((card) => (
               <KpiCard key={card.label} {...card} />
             ))}
+          </section>
+
+          <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+            <article className="lumina-shell min-h-[420px]">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="lumina-label text-cyan-300">Carga rápida</p>
+                  <h2 className="lumina-title mt-3 text-slate-100">
+                    Crear deuda para la empresa activa
+                  </h2>
+                </div>
+                <span className="lumina-trust-badge">
+                  Tenant {activeCompanyId ?? "—"}
+                </span>
+              </div>
+
+              <p className="mt-4 text-sm leading-6 text-slate-400">
+                Este atajo reutiliza la misma API administrativa de deudas sin mover al usuario fuera de `/admin`.
+              </p>
+
+              {debtSubmitting ? (
+                <div className="flex min-h-[280px] items-center justify-center">
+                  <AiOutlineLoading3Quarters className="animate-spin text-5xl text-cyan-300" />
+                </div>
+              ) : (
+                <form className="mt-6 flex flex-col gap-4" onSubmit={handleCreateDebt}>
+                  <div>
+                    <label className="lumina-label mb-2 block text-slate-300">
+                      Número de documento
+                    </label>
+                    <input
+                      type="text"
+                      value={documento}
+                      onChange={(event) => setDocumento(event.target.value)}
+                      placeholder="Ej: 1234567"
+                      className="lumina-input"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="lumina-label mb-2 block text-slate-300">
+                      Concepto
+                    </label>
+                    <input
+                      type="text"
+                      value={concepto}
+                      onChange={(event) => setConcepto(event.target.value)}
+                      placeholder="Ej: mensualidad julio"
+                      className="lumina-input"
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="lumina-label mb-2 block text-slate-300">
+                        Fecha de vencimiento
+                      </label>
+                      <input
+                        type="date"
+                        value={fecha}
+                        onChange={(event) => setFecha(event.target.value)}
+                        className="lumina-input"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="lumina-label mb-2 block text-slate-300">
+                        Monto (Bs.)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={monto}
+                        onChange={(event) => setMonto(event.target.value)}
+                        placeholder="0.00"
+                        className="lumina-input"
+                      />
+                    </div>
+                  </div>
+
+                  {debtFeedback && (
+                    <div
+                      className={`rounded-2xl border px-4 py-3 text-sm ${
+                        debtFeedback.includes("correctamente")
+                          ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                          : "border-rose-400/30 bg-rose-500/10 text-rose-200"
+                      }`}
+                    >
+                      {debtFeedback}
+                    </div>
+                  )}
+
+                  <button type="submit" className="lumina-button-primary mt-2">
+                    <FiPlusCircle />
+                    Crear deuda
+                  </button>
+                </form>
+              )}
+            </article>
+
+            <article className="lumina-shell min-h-[420px]">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="lumina-label text-cyan-300">Deudas por tenant</p>
+                  <h2 className="lumina-title mt-3 text-slate-100">
+                    Deudas de la empresa activa
+                  </h2>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={`lumina-tab ${debtTab === "pendientes" ? "is-active" : ""}`}
+                    onClick={() => setDebtTab("pendientes")}
+                  >
+                    Pendientes
+                  </button>
+                  <button
+                    type="button"
+                    className={`lumina-tab ${debtTab === "pagadas" ? "is-active" : ""}`}
+                    onClick={() => setDebtTab("pagadas")}
+                  >
+                    Pagadas
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-400">
+                <span className="lumina-inline-stat">
+                  <FiCheckCircle className="text-cyan-300" />
+                  {activeCompany?.name || "Sin empresa activa"}
+                </span>
+                <button
+                  type="button"
+                  className="lumina-button-secondary"
+                  onClick={loadAdminDebts}
+                  disabled={debtLoading}
+                >
+                  <FiRefreshCw />
+                  Refrescar deudas
+                </button>
+              </div>
+
+              {debtLoading ? (
+                <div className="mt-6 flex min-h-[240px] items-center justify-center">
+                  <AiOutlineLoading3Quarters className="animate-spin text-4xl text-cyan-300" />
+                </div>
+              ) : (
+                <div className="mt-6 flex flex-col gap-4">
+                  {visibleDebtRows.length > 0 ? (
+                    visibleDebtRows.map((deuda) => (
+                      <div key={deuda.id} className="lumina-interactive-card">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-sm text-slate-500">
+                              Doc. {deuda.documento}
+                            </p>
+                            <p className="mt-2 text-lg font-semibold text-slate-100">
+                              {deuda.concepto}
+                            </p>
+                          </div>
+                          <span className="lumina-trust-badge">
+                            {deuda.estado === "pendiente" ? "Pendiente" : "Pagada"}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                              Monto
+                            </p>
+                            <p className="mt-2 text-base font-medium text-slate-100">
+                              {formatAmount(deuda.monto)}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                              Vencimiento
+                            </p>
+                            <p className="mt-2 text-base font-medium text-slate-100">
+                              {deuda.fecha}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-[24px] border border-white/8 bg-white/[0.03] px-6 py-8 text-center text-sm text-slate-400">
+                      No hay deudas {debtTab === "pendientes" ? "pendientes" : "pagadas"} para la empresa activa.
+                    </div>
+                  )}
+                </div>
+              )}
+            </article>
           </section>
 
           <section className="grid gap-6 xl:grid-cols-[1.35fr_0.9fr]">
