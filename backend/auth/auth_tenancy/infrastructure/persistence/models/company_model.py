@@ -5,6 +5,7 @@ class CompanyModel(models.Model):
     name = models.CharField(max_length=150)
     nit = models.CharField(max_length=30, unique=True)
     fiscal_address = models.CharField(max_length=255, blank=True, null=True)
+    active = models.BooleanField(default=True)
     logo_url = models.URLField(max_length=500, blank=True, null=True)
 
     slug = models.SlugField(max_length=150, unique=True, blank=True, null=True)
@@ -15,7 +16,7 @@ class CompanyModel(models.Model):
     status = models.CharField(
         max_length=20,
         choices=[(s.name, s.value) for s in CompanyStatus],
-        default=CompanyStatus.APPROVED.value
+        default=CompanyStatus.PENDING.value
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

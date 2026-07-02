@@ -11,7 +11,7 @@ const HomePage = () => {
   const { selectedCompany, currentFlowStep } = selectionView;
 
   return (
-    <div className="lumina-page relative overflow-hidden">
+    <div className="lumina-page relative overflow-hidden">    
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-[-120px] top-[-80px] h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
         <div className="absolute right-[-100px] top-1/4 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
