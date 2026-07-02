@@ -6,7 +6,6 @@ const morgan = require("morgan");
 const app = express();
 const PORT = 3000;
 
-// Middlewares globales
 app.use(cors());
 app.use(morgan("dev"));
 
@@ -73,11 +72,11 @@ app.use(
 // Catálogo (Protegido y Público)
 app.use(
   "/api/admin",
-  proxy("http://catalogo:3000", { "^/api/admin": "/api/admin" }),
+  proxy("http://catalogo:3000", { "^/": "/api/admin/" }),
 );
 app.use(
   "/api/catalog",
-  proxy("http://catalogo:3000", { "^/api/catalog": "/api" }),
+  proxy("http://catalogo:3000", { "^/": "/api/" }),
 );
 
 // Pagos

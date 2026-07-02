@@ -6,13 +6,13 @@ import { AppDataSource } from "../database/connection.js";
 
 export class CompanyRepositoryImpl {
   async findById(id) {
-    const doc = await CompanyModel.findOne({ id });
+    const doc = await CompanyModel.findOne({ companyId: id });
     if (!doc) return null;
     return new Company(doc.id, doc.name, doc.status);
   }
 
   async save(company) {
-    const pgRepo = getPostgresConnection().getRepository(CompanyEntity);
+    const pgRepo = AppDataSource.getRepository(CompanyEntity);
     const newCompany = pgRepo.create({
       id: company.id,
       name: company.name,
@@ -21,19 +21,30 @@ export class CompanyRepositoryImpl {
     await pgRepo.save(newCompany);
 
     const mongoDoc = new CompanyModel({
-      id: company.id,
+      companyId: company.id,
       name: company.name,
+      nit: company.nit,
       status: company.status,
+      active: company.active,
+      logoUrl: company.logoUrl || null,
     });
     await mongoDoc.save();
   }
 
   async update(id, company) {
-    const pgRepo = getPostgresConnection().getRepository(CompanyEntity);
+    const pgRepo = AppDataSource.getRepository(CompanyEntity);
     await pgRepo.update({ id }, { name: company.name, status: company.status });
     await CompanyModel.updateOne(
-      { id },
-      { $set: { name: company.name, status: company.status } },
+      { companyId: id },
+      {
+        $set: {
+          name: company.name,
+          nit: company.nit,
+          status: company.status,
+          active: company.active,
+          logoUrl: company.logoUrl || null,
+        },
+      },
     );
   }
 

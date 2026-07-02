@@ -107,7 +107,7 @@ export class ServiceRepositoryImpl {
 
   async findAllActiveForRead() {
     return await CatalogServiceModel.find(
-      { active: true },
+      { isPublished: true, companyStatus: "APPROVED", companyActive: true },
       { _id: 0, __v: 0 },
     ).lean();
   }
