@@ -47,6 +47,8 @@ test("debt presenters preserve public and admin API contracts", () => {
     description: "Pago de servicios",
     image: "https://placehold.net/1.png",
     idProveedor: "tenant-1",
+    tenantId: "tenant-1",
+    active: undefined,
   });
   assert.deepEqual(publicDebt, {
     id: "11",

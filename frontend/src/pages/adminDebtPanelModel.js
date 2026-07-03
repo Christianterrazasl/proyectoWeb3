@@ -1,24 +1,27 @@
-export function slugifyDebtServiceId(value, fallbackCompanyId = "manual") {
-  const slug = String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_")
-    .replace(/[^a-z0-9._-]/g, "")
-    .slice(0, 50);
+export function buildCatalogServiceOptions(services = []) {
+  return services.reduce((options, service) => {
+    const id = String(service?.serviceId || service?.id || "").trim();
+    const label = String(service?.serviceName || service?.name || id).trim();
 
-  return slug || `manual_${fallbackCompanyId}`;
+    if (!id || !label) {
+      return options;
+    }
+
+    options.push({ id, label });
+    return options;
+  }, []);
 }
 
 export function buildAdminDebtPayload({
   activeCompanyId,
+  serviceId,
   documento,
-  concepto,
   monto,
   fecha,
 }) {
   return {
     tenantId: String(activeCompanyId),
-    serviceId: slugifyDebtServiceId(concepto, activeCompanyId),
+    serviceId: String(serviceId || "").trim(),
     customerRef: String(documento || "").trim(),
     period: String(fecha || "").slice(0, 7),
     amount: Number(monto),
@@ -28,11 +31,12 @@ export function buildAdminDebtPayload({
 
 export function mapAdminDebtToRow(debt) {
   const status = String(debt?.status || "").toUpperCase();
+  const serviceId = String(debt?.serviceId || "").trim();
 
   return {
     id: debt?.id,
     documento: debt?.customerRef || "—",
-    concepto: debt?.serviceId || "Servicio manual",
+    concepto: serviceId || "—",
     monto: Number(debt?.amount || 0),
     fecha: debt?.dueDate ? String(debt.dueDate).slice(0, 10) : "—",
     estado:

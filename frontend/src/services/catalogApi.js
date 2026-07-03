@@ -1,5 +1,9 @@
+import { buildAuthenticatedRequestInit } from "./authApi.js";
+
 const ADMIN_CATALOG_BASE =
   import.meta.env?.VITE_ADMIN_CATALOG_API_URL || "/api/admin";
+const COMPANY_CATALOG_BASE =
+  import.meta.env?.VITE_COMPANY_CATALOG_API_URL || "/api/catalog";
 
 async function parseJsonResponse(response) {
   const contentType = response.headers.get("content-type") || "";
@@ -26,7 +30,7 @@ function slugifyServiceId(value) {
     .replace(/[^a-z0-9-]/g, "")
     .slice(0, 50);
 
-  return slug || `servicio-${Date.now()}`;
+  return slug;
 }
 
 export async function createCatalogCompany(accessToken, { id, name }) {
@@ -51,6 +55,10 @@ export async function createCatalogCompany(accessToken, { id, name }) {
 export async function createCatalogService(accessToken, { companyId, name }) {
   const serviceId = slugifyServiceId(name);
 
+  if (!serviceId) {
+    throw new Error("Se requiere un nombre de servicio válido");
+  }
+
   const response = await fetch(`${ADMIN_CATALOG_BASE}/services`, {
     method: "POST",
     headers: adminAuthHeaders(accessToken),
@@ -58,11 +66,6 @@ export async function createCatalogService(accessToken, { companyId, name }) {
       id: serviceId,
       companyId: Number(companyId),
       name,
-      inputSchema: {
-        label: "Cédula de identidad",
-        type: "text",
-        placeholder: "Ej: 1234567",
-      },
     }),
   });
 
@@ -75,6 +78,44 @@ export async function createCatalogService(accessToken, { companyId, name }) {
   return data?.data ?? data;
 }
 
+export async function listAdminCompanyCatalogServices(accessToken, companyId) {
+  const response = await fetch(
+    `${ADMIN_CATALOG_BASE}/companies/${encodeURIComponent(String(companyId))}/services`,
+    {
+      headers: adminAuthHeaders(accessToken),
+    },
+  );
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(data?.message || "No se pudieron cargar los servicios del catálogo");
+  }
+
+  return data?.data ?? data ?? [];
+}
+
+export async function listProviderCatalogServices(accessToken) {
+  const response = await fetch(
+    `${COMPANY_CATALOG_BASE}/company/services`,
+    buildAuthenticatedRequestInit({
+      method: "GET",
+      accessToken,
+      companyId: null,
+    }),
+  );
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(data?.message || "No se pudieron cargar los servicios del catálogo");
+  }
+
+  return data?.data ?? data ?? [];
+}
+
+export const listCompanyCatalogServices = listAdminCompanyCatalogServices;
+
 export async function syncProviderCatalog(accessToken, { companyId, name }) {
   try {
     await createCatalogCompany(accessToken, { id: companyId, name });
@@ -83,9 +124,4 @@ export async function syncProviderCatalog(accessToken, { companyId, name }) {
       throw error;
     }
   }
-
-  await createCatalogService(accessToken, {
-    companyId,
-    name: `Pago ${name}`,
-  });
 }

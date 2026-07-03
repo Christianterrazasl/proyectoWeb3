@@ -62,7 +62,7 @@ export class CompanyController {
   }
 
   async getCompanyServices(req, res) {
-    let companyId = req.params.companyId;
+    let companyId = req.params.companyId ?? req.companyId;
     if (req.user && req.user.global_role === "COMPANY_ADMIN") {
       companyId = req.user.tenant_id;
     }

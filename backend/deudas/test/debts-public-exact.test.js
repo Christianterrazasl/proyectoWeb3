@@ -129,3 +129,56 @@ test("PATCH /internal/debts/:id/status devuelve conflicto si la deuda exacta ya 
   assert.equal(response.body.success, false);
   assert.match(response.body.message, /exacta.*pendiente/i);
 });
+
+test("GET /debts/lookup no expone deudas de otro servicio cuando falla la coincidencia exacta", async () => {
+  const queries = [];
+
+  const app = createApp({
+    prismaClient: {
+      provider: {
+        findMany: async () => [],
+      },
+      debt: {
+        findMany: async (query) => {
+          queries.push(query);
+
+          if (query.where.service_id === "agua") {
+            return [];
+          }
+
+          return [
+            {
+              id: 99,
+              tenant_id: "tenant-1",
+              service_id: "internet",
+              customer_ref: "9988",
+              period: "2026-06",
+              amount: 44,
+              due_date: new Date("2026-06-30T00:00:00.000Z"),
+              status: "PENDING",
+            },
+          ];
+        },
+      },
+    },
+  });
+
+  const response = await request(app).get("/debts/lookup").query({
+    tenantId: "tenant-1",
+    serviceId: "agua",
+    customerRef: "9988",
+  });
+
+  assert.equal(response.status, 404);
+  assert.equal(queries.length, 1);
+  assert.deepEqual(queries[0], {
+    where: {
+      tenant_id: "tenant-1",
+      customer_ref: "9988",
+      status: "PENDING",
+      service_id: "agua",
+    },
+    orderBy: { due_date: "asc" },
+  });
+  assert.match(response.body.message, /deudas pendientes/i);
+});

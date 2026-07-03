@@ -7,6 +7,7 @@ function registerAdminProviderRoutes(app, {
   requireAdminSessionMiddleware = requireAdminSession,
 }) {
   const withAdmin = (handler) => [requireAdminSessionMiddleware, handler];
+  const normalizeOptionalMetadata = (value) => normalizeInput(value);
 
   app.get("/admin/providers", ...withAdmin(async (_req, res) => {
     try {
@@ -30,12 +31,10 @@ function registerAdminProviderRoutes(app, {
   app.post("/admin/providers", ...withAdmin(async (req, res) => {
     const tenantId = normalizeInput(req.body?.tenantId);
     const name = normalizeInput(req.body?.name);
-    const description =
-      normalizeInput(req.body?.description) || "Pago de servicios";
-    const imageUrl =
-      normalizeInput(req.body?.imageUrl) ||
-      normalizeInput(req.body?.image_url) ||
-      "https://placehold.net/1.png";
+    const description = normalizeOptionalMetadata(req.body?.description);
+    const imageUrl = normalizeOptionalMetadata(
+      req.body?.imageUrl ?? req.body?.image_url,
+    );
     const sortOrder = Number(req.body?.sortOrder ?? req.body?.sort_order);
 
     if (!tenantId || !name) {

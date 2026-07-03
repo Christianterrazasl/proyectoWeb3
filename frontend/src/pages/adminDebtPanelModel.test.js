@@ -2,29 +2,39 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildCatalogServiceOptions,
   buildAdminDebtPayload,
   filterAdminDebtRows,
   mapAdminDebtToRow,
-  slugifyDebtServiceId,
 } from "./adminDebtPanelModel.js";
 
-test("slugifyDebtServiceId normalizes labels for manual admin debt creation", () => {
-  assert.equal(slugifyDebtServiceId("Colegiatura Julio 2026"), "colegiatura_julio_2026");
-  assert.equal(slugifyDebtServiceId("***", 77), "manual_77");
+test("buildCatalogServiceOptions keeps only real catalog services", () => {
+  assert.deepEqual(
+    buildCatalogServiceOptions([
+      { serviceId: "agua", serviceName: "Agua residencial" },
+      { id: "internet", name: "Internet fibra" },
+      { serviceId: "", serviceName: "Inválido" },
+      null,
+    ]),
+    [
+      { id: "agua", label: "Agua residencial" },
+      { id: "internet", label: "Internet fibra" },
+    ],
+  );
 });
 
-test("buildAdminDebtPayload derives the admin debt request from form fields", () => {
+test("buildAdminDebtPayload uses the selected real serviceId", () => {
   assert.deepEqual(
     buildAdminDebtPayload({
       activeCompanyId: 42,
+      serviceId: "mensualidad-vip",
       documento: " 1234567 ",
-      concepto: "Mensualidad VIP",
       monto: "250.50",
       fecha: "2026-07-15",
     }),
     {
       tenantId: "42",
-      serviceId: "mensualidad_vip",
+      serviceId: "mensualidad-vip",
       customerRef: "1234567",
       period: "2026-07",
       amount: 250.5,
@@ -53,6 +63,22 @@ test("mapAdminDebtToRow and filterAdminDebtRows expose paid and pending states",
     }),
   ];
 
+  assert.equal(rows[0].concepto, "agua");
+  assert.equal(rows[1].concepto, "internet");
   assert.deepEqual(filterAdminDebtRows(rows, "pendientes").map((row) => row.id), [1]);
   assert.deepEqual(filterAdminDebtRows(rows, "pagadas").map((row) => row.id), [2]);
+});
+
+test("mapAdminDebtToRow preserves missing serviceId without inventing a manual label", () => {
+  assert.equal(
+    mapAdminDebtToRow({
+      id: 3,
+      customerRef: "C-3",
+      serviceId: "",
+      amount: 25,
+      dueDate: "2026-07-21T00:00:00.000Z",
+      status: "PENDING",
+    }).concepto,
+    "—",
+  );
 });

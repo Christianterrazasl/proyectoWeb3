@@ -7,9 +7,15 @@ export class ListAdminServicesQuery extends QueryHandler {
   }
 
   async execute(tenantId = null) {
-    if (tenantId) {
-      return await this.serviceRepository.findByCompanyId(tenantId);
+    const resolvedTenantId =
+      tenantId !== null && typeof tenantId === "object"
+        ? tenantId.companyId
+        : tenantId;
+
+    if (resolvedTenantId) {
+      return await this.serviceRepository.findByCompanyId(resolvedTenantId);
     }
+
     return await this.serviceRepository.findAllForRead();
   }
 }

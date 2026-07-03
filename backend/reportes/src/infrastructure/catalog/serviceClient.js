@@ -1,6 +1,6 @@
 const DEFAULT_CATALOG_ADMIN_SERVICES_URL =
   process.env.CATALOG_ADMIN_SERVICES_URL ||
-  "http://catalogo:3000/api/admin/services";
+  "http://catalogo:3000/api/services";
 
 export function createServiceClient({
   servicesUrl = DEFAULT_CATALOG_ADMIN_SERVICES_URL,

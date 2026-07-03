@@ -8,7 +8,10 @@ import {
   deleteCompanyRequest,
   listCompaniesRequest,
 } from "../services/authApi";
-import { syncProviderCatalog } from "../services/catalogApi";
+import {
+  listAdminCompanyCatalogServices,
+  syncProviderCatalog,
+} from "../services/catalogApi";
 import {
   createAdminProvider,
   createProviderDebt,
@@ -17,12 +20,12 @@ import {
   listProviderDebts,
 } from "../services/deudasApi";
 import {
-  getAuditLogs,
   getCompanyPortfolioSummary,
   getDashboardSummary,
   getTransactionMonitoring,
 } from "../services/reportesApi";
 import {
+  buildCatalogServiceOptions,
   buildAdminDebtPayload,
   filterAdminDebtRows,
   mapAdminDebtToRow,
@@ -50,7 +53,7 @@ const AdminPage = () => {
   const [transactionRows, setTransactionRows] = useState([]);
   const [dashboardError, setDashboardError] = useState("");
   const [documento, setDocumento] = useState("");
-  const [concepto, setConcepto] = useState("");
+  const [selectedServiceId, setSelectedServiceId] = useState("");
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState("");
   const [debtRows, setDebtRows] = useState([]);
@@ -58,6 +61,7 @@ const AdminPage = () => {
   const [debtFeedback, setDebtFeedback] = useState("");
   const [debtLoading, setDebtLoading] = useState(false);
   const [debtSubmitting, setDebtSubmitting] = useState(false);
+  const [catalogServiceOptions, setCatalogServiceOptions] = useState([]);
   const [providerRows, setProviderRows] = useState([]);
   const [providerName, setProviderName] = useState("");
   const [providerDescription, setProviderDescription] = useState("");
@@ -90,6 +94,30 @@ const AdminPage = () => {
     () => providerRows.filter((provider) => provider.active && provider.providerActive),
     [providerRows],
   );
+
+  const loadCatalogServices = useCallback(async () => {
+    if (!session?.access || !activeCompanyId) {
+      setCatalogServiceOptions([]);
+      setSelectedServiceId("");
+      return;
+    }
+
+    try {
+      const services = await listAdminCompanyCatalogServices(session.access, activeCompanyId);
+      const options = buildCatalogServiceOptions(services);
+
+      setCatalogServiceOptions(options);
+      setSelectedServiceId((currentValue) =>
+        options.some((option) => option.id === currentValue)
+          ? currentValue
+          : (options[0]?.id ?? ""),
+      );
+    } catch (error) {
+      setCatalogServiceOptions([]);
+      setSelectedServiceId("");
+      setDebtFeedback(error.message || "No se pudieron cargar los servicios del catálogo");
+    }
+  }, [activeCompanyId, session?.access]);
 
   const loadAdminProviders = useCallback(async () => {
     if (!session?.access) {
@@ -183,6 +211,10 @@ const AdminPage = () => {
     loadAdminProviders();
   }, [loadAdminProviders]);
 
+  useEffect(() => {
+    loadCatalogServices();
+  }, [loadCatalogServices]);
+
   const handleCreateProvider = async (event) => {
     event.preventDefault();
 
@@ -211,9 +243,7 @@ const AdminPage = () => {
         accessToken: session.access,
         tenantId: company.id,
         name: company.name,
-        description:
-          providerDescription.trim() ||
-          `Pago de servicios de ${company.name}`,
+        description: providerDescription.trim() || undefined,
       });
 
       try {
@@ -267,7 +297,7 @@ const AdminPage = () => {
   const handleCreateDebt = async (event) => {
     event.preventDefault();
 
-    if (!documento.trim() || !concepto.trim() || !monto || !fecha) {
+    if (!documento.trim() || !selectedServiceId || !monto || !fecha) {
       setDebtFeedback("Completa todos los campos");
       return;
     }
@@ -286,15 +316,14 @@ const AdminPage = () => {
         companyId: activeCompanyId,
         ...buildAdminDebtPayload({
           activeCompanyId,
+          serviceId: selectedServiceId,
           documento,
-          concepto,
           monto,
           fecha,
         }),
       });
 
       setDocumento("");
-      setConcepto("");
       setMonto("");
       setFecha("");
       setDebtTab("pendientes");
@@ -403,13 +432,21 @@ const AdminPage = () => {
                   placeholder="Documento"
                   className="lumina-input"
                 />
-                <input
-                  type="text"
-                  value={concepto}
-                  onChange={(event) => setConcepto(event.target.value)}
-                  placeholder="Concepto"
+                <select
+                  value={selectedServiceId}
+                  onChange={(event) => setSelectedServiceId(event.target.value)}
                   className="lumina-input"
-                />
+                  disabled={catalogServiceOptions.length === 0}
+                >
+                  {catalogServiceOptions.length === 0 ? (
+                    <option value="">Sin servicios reales en catálogo</option>
+                  ) : null}
+                  {catalogServiceOptions.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.label}
+                    </option>
+                  ))}
+                </select>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <input
                     type="date"

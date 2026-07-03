@@ -2,6 +2,10 @@ const express = require("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
 const cors = require("cors");
 const morgan = require("morgan");
+const {
+  rewriteAdminCompaniesPath,
+  rewriteAdminServicesPath,
+} = require("./proxyConfig");
 
 const app = express();
 const PORT = 3000;
@@ -82,11 +86,11 @@ app.use(
 // Catálogo admin (rutas explícitas antes del catch-all)
 app.use(
   "/api/admin/companies",
-  proxy("http://catalogo:3000", { "^/api/admin/companies": "/api/companies" }),
+  proxy("http://catalogo:3000", rewriteAdminCompaniesPath),
 );
 app.use(
   "/api/admin/services",
-  proxy("http://catalogo:3000", { "^/api/admin/services": "/api/services" }),
+  proxy("http://catalogo:3000", rewriteAdminServicesPath),
 );
 
 // Catálogo admin

@@ -64,6 +64,8 @@ test("GET /debts/providers/:tenantId/customers/:customerRef returns scoped publi
       description: "Pago de servicios",
       image: "https://placehold.net/1.png",
       idProveedor: "1",
+      tenantId: "1",
+      active: true,
     },
     customerRef: "1234567",
     debts: [

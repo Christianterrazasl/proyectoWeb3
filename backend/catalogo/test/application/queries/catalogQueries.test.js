@@ -9,8 +9,8 @@ import { GetServiceByIdQuery } from "../../../src/application/queries/GetService
 test("ListAdminServicesQuery usa findAll cuando no hay companyId", async () => {
   let called = "";
   const repository = {
-    async findAll() {
-      called = "findAll";
+    async findAllForRead() {
+      called = "findAllForRead";
       return [{ serviceId: "srv-1" }];
     },
     async findByCompanyId() {
@@ -21,7 +21,7 @@ test("ListAdminServicesQuery usa findAll cuando no hay companyId", async () => {
   const query = new ListAdminServicesQuery(repository);
   const result = await query.execute({ companyId: null });
 
-  assert.equal(called, "findAll");
+  assert.equal(called, "findAllForRead");
   assert.deepEqual(result, [{ serviceId: "srv-1" }]);
 });
 
@@ -38,23 +38,74 @@ test("ListAdminServicesQuery usa findByCompanyId cuando recibe companyId", async
   };
 
   const query = new ListAdminServicesQuery(repository);
-  const result = await query.execute({ companyId: 7 });
+  const result = await query.execute(7);
 
   assert.equal(receivedCompanyId, 7);
   assert.deepEqual(result, [{ serviceId: "srv-2", companyId: 7 }]);
 });
 
-test("GetCatalogQuery obtiene el catálogo desde el repositorio de lectura", async () => {
-  const repository = {
-    async findAll() {
-      return [{ serviceId: "srv-3", public: true }];
+test("GetCatalogQuery mapea servicios con companyName real", async () => {
+  const serviceRepository = {
+    async findAllActiveForRead() {
+      return [
+        {
+          serviceId: "srv-3",
+          serviceName: "Pago colegio",
+          companyId: 9,
+          inputSchema: { label: "CI" },
+          category: "Educación",
+          description: "Pago mensual",
+          companyLogoUrl: "https://cdn/logo.png",
+        },
+      ];
+    },
+  };
+  const companyRepository = {
+    async findAllForRead() {
+      return [{ companyId: 9, name: "Colegio Real" }];
     },
   };
 
-  const query = new GetCatalogQuery(repository);
+  const query = new GetCatalogQuery(serviceRepository, companyRepository);
   const result = await query.execute();
 
-  assert.deepEqual(result, [{ serviceId: "srv-3", public: true }]);
+  assert.deepEqual(result, [
+    {
+      id: "srv-3",
+      name: "Pago colegio",
+      companyId: 9,
+      companyName: "Colegio Real",
+      inputSchema: { label: "CI" },
+      category: "Educación",
+      description: "Pago mensual",
+      logoUrl: "https://cdn/logo.png",
+    },
+  ]);
+});
+
+test("GetCatalogQuery excluye filas inconsistentes sin companyName real", async () => {
+  const serviceRepository = {
+    async findAllActiveForRead() {
+      return [
+        {
+          serviceId: "srv-4",
+          serviceName: "Pago huérfano",
+          companyId: 10,
+          inputSchema: { label: "CI" },
+        },
+      ];
+    },
+  };
+  const companyRepository = {
+    async findAllForRead() {
+      return [];
+    },
+  };
+
+  const query = new GetCatalogQuery(serviceRepository, companyRepository);
+  const result = await query.execute();
+
+  assert.deepEqual(result, []);
 });
 
 test("GetCompanyServicesQuery obtiene servicios por empresa", async () => {

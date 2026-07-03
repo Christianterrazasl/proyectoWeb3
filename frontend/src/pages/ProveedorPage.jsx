@@ -3,18 +3,12 @@ import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { FiLogOut, FiPlusCircle } from "react-icons/fi";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
+import { listProviderCatalogServices } from "../services/catalogApi";
 import { createProviderDebt, listProviderDebts } from "../services/deudasApi";
-
-function slugifyServiceId(value) {
-  const slug = String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_")
-    .replace(/[^a-z0-9._-]/g, "")
-    .slice(0, 50);
-
-  return slug || `deuda_${Date.now()}`;
-}
+import {
+  buildAdminDebtPayload,
+  buildCatalogServiceOptions,
+} from "./adminDebtPanelModel";
 
 function mapDebtToRow(debt) {
   const status = String(debt.status || "").toUpperCase();
@@ -31,10 +25,11 @@ function mapDebtToRow(debt) {
 
 const ProveedorPage = () => {
   const [documento, setDocumento] = useState("");
-  const [concepto, setConcepto] = useState("");
+  const [selectedServiceId, setSelectedServiceId] = useState("");
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState("");
   const [deudas, setDeudas] = useState([]);
+  const [catalogServiceOptions, setCatalogServiceOptions] = useState([]);
   const [tab, setTab] = useState("pendientes");
   const [loading, setLoading] = useState(false);
   const [listLoading, setListLoading] = useState(false);
@@ -69,10 +64,38 @@ const ProveedorPage = () => {
     loadDebts();
   }, [loadDebts]);
 
+  useEffect(() => {
+    const loadCatalogServices = async () => {
+      if (!session?.access || !activeCompanyId) {
+        setCatalogServiceOptions([]);
+        setSelectedServiceId("");
+        return;
+      }
+
+      try {
+        const services = await listProviderCatalogServices(session.access);
+        const options = buildCatalogServiceOptions(services);
+
+        setCatalogServiceOptions(options);
+        setSelectedServiceId((currentValue) =>
+          options.some((option) => option.id === currentValue)
+            ? currentValue
+            : (options[0]?.id ?? ""),
+        );
+      } catch (error) {
+        setCatalogServiceOptions([]);
+        setSelectedServiceId("");
+        setMensaje(error.message || "No se pudieron cargar los servicios del catálogo");
+      }
+    };
+
+    loadCatalogServices();
+  }, [activeCompanyId, session?.access]);
+
   const handleCargarDeuda = async (e) => {
     e.preventDefault();
 
-    if (!documento.trim() || !concepto.trim() || !monto || !fecha) {
+    if (!documento.trim() || !selectedServiceId || !monto || !fecha) {
       setMensaje("Completa todos los campos");
       return;
     }
@@ -89,16 +112,16 @@ const ProveedorPage = () => {
       await createProviderDebt({
         accessToken: session.access,
         companyId: activeCompanyId,
-        tenantId: String(activeCompanyId),
-        serviceId: slugifyServiceId(concepto),
-        customerRef: documento.trim(),
-        period: fecha.slice(0, 7),
-        amount: Number(monto),
-        dueDate: `${fecha}T00:00:00.000Z`,
+        ...buildAdminDebtPayload({
+          activeCompanyId,
+          serviceId: selectedServiceId,
+          documento,
+          monto,
+          fecha,
+        }),
       });
 
       setDocumento("");
-      setConcepto("");
       setMonto("");
       setFecha("");
       setMensaje("Deuda cargada");
@@ -169,13 +192,22 @@ const ProveedorPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="lumina-label mb-2 block">Concepto</label>
-                  <input
-                    type="text"
-                    value={concepto}
-                    onChange={(e) => setConcepto(e.target.value)}
+                  <label className="lumina-label mb-2 block">Servicio</label>
+                  <select
+                    value={selectedServiceId}
+                    onChange={(e) => setSelectedServiceId(e.target.value)}
                     className="lumina-input"
-                  />
+                    disabled={catalogServiceOptions.length === 0}
+                  >
+                    {catalogServiceOptions.length === 0 ? (
+                      <option value="">Sin servicios reales en catálogo</option>
+                    ) : null}
+                    {catalogServiceOptions.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>

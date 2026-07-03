@@ -140,26 +140,15 @@ function registerPublicDebtRoutes(app, { prismaClient }) {
     }
 
     try {
-      const baseWhere = {
-        tenant_id: tenantId,
-        customer_ref: customerRef,
-        status: "PENDING",
-      };
-
-      let debts = await prismaClient.debt.findMany({
+      const debts = await prismaClient.debt.findMany({
         where: {
-          ...baseWhere,
+          tenant_id: tenantId,
+          customer_ref: customerRef,
+          status: "PENDING",
           service_id: serviceId,
         },
         orderBy: { due_date: "asc" },
       });
-
-      if (!debts.length) {
-        debts = await prismaClient.debt.findMany({
-          where: baseWhere,
-          orderBy: { due_date: "asc" },
-        });
-      }
 
       if (!debts.length) {
         return res.status(404).json({

@@ -3,6 +3,7 @@ import { CompanyController } from "../controllers/CompanyController.js";
 import { CompanyRepositoryImpl } from "../../infrastructure/repositories_impl/CompanyRepositoryImpl.js";
 import { ServiceRepositoryImpl } from "../../infrastructure/repositories_impl/ServiceRepositoryImpl.js";
 import { requireAdminSession } from "../middleware/requireAdminSession.js";
+import { requireCompanySession } from "../middleware/requireCompanySession.js";
 
 const router = Router();
 const companyRepo = new CompanyRepositoryImpl();
@@ -14,6 +15,10 @@ router.get("/public/services", (req, res) =>
 );
 
 router.get("/public/companies/:companyId/services", (req, res) =>
+  controller.getCompanyServices(req, res),
+);
+
+router.get("/company/services", requireCompanySession, (req, res) =>
   controller.getCompanyServices(req, res),
 );
 

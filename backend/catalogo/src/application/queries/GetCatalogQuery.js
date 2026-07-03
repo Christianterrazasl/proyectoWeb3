@@ -11,21 +11,28 @@ export class GetCatalogQuery extends QueryHandler {
     const services = await this.serviceRepository.findAllActiveForRead();
     const companies = await this.companyRepository.findAllForRead();
 
-    return services.map((service) => {
+    return services.reduce((catalog, service) => {
       const company = companies.find(
-        (c) => c.companyId === service.companyId,
+        (candidate) => candidate.companyId === service.companyId,
       );
-      return {
+      const companyName = String(company?.name || service.companyName || "").trim();
+
+      if (!companyName) {
+        return catalog;
+      }
+
+      catalog.push({
         id: service.serviceId || service.id,
         name: service.serviceName || service.name,
         companyId: service.companyId,
-        companyName: company?.name || service.companyName || "Desconocida",
+        companyName,
         inputSchema: service.inputSchema,
         category: service.category || "",
         description: service.description || "",
         logoUrl: service.companyLogoUrl || "",
-      }
+      });
 
-    });
+      return catalog;
+    }, []);
   }
 }
