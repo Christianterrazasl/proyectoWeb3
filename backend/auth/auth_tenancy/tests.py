@@ -1,6 +1,7 @@
 from importlib import import_module
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import SimpleTestCase
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
@@ -17,6 +18,7 @@ from auth_tenancy.application.handlers import (
     GetUserDetailHandler,
     LoginUserHandler,
 )
+from auth_tenancy.management.commands.seed_auth_tenancy import DEMO_COMPANIES
 from auth_tenancy.infrastructure.persistence.models import CompanyModel, MembershipModel
 
 
@@ -90,6 +92,40 @@ class AuthTenancyApiTests(APITestCase):
         self.assertEqual(me_response.data["memberships"], [])
         self.assertEqual(me_response.data["accessible_companies"], [])
         self.assertIsNone(me_response.data["active_company_id"])
+
+    def test_refresh_returns_a_new_access_token_for_valid_refresh_tokens(self):
+        register_response = self.client.post(
+            "/api/auth/register/",
+            {
+                "username": "refresh-user",
+                "email": "refresh@test.com",
+                "password": "123456",
+            },
+            format="json",
+        )
+
+        self.assertEqual(register_response.status_code, status.HTTP_201_CREATED)
+
+        login_response = self.client.post(
+            "/api/auth/login/",
+            {
+                "email": "refresh@test.com",
+                "password": "123456",
+            },
+            format="json",
+        )
+
+        refresh_response = self.client.post(
+            "/api/auth/refresh/",
+            {
+                "refresh": login_response.data["refresh"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(refresh_response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", refresh_response.data)
+        self.assertTrue(refresh_response.data["access"])
 
     def test_me_returns_bootstrap_context_for_multi_company_memberships(self):
         user = self.user_model.objects.create_user(
@@ -244,3 +280,29 @@ class AuthTenancyApiTests(APITestCase):
 
         self.assertEqual(membership_response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(membership_response.data["company_role"], "provider")
+
+    def test_seed_auth_tenancy_creates_multi_company_demo_provider_context(self):
+        call_command("seed_auth_tenancy")
+
+        provider = self.user_model.objects.get(email="provider@multipagos.dev")
+        expected_company_ids = [company["id"] for company in DEMO_COMPANIES]
+
+        membership_company_ids = list(
+            MembershipModel.objects.filter(user=provider, active=True)
+            .order_by("company_id")
+            .values_list("company_id", flat=True)
+        )
+        self.assertEqual(membership_company_ids, sorted(expected_company_ids))
+
+        self.client.force_authenticate(user=provider)
+        me_response = self.client.get(
+            "/api/auth/me/",
+            HTTP_X_COMPANY_ID=str(expected_company_ids[1]),
+        )
+
+        self.assertEqual(me_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(me_response.data["active_company_id"], expected_company_ids[1])
+        self.assertEqual(
+            sorted(company["id"] for company in me_response.data["accessible_companies"]),
+            sorted(expected_company_ids),
+        )

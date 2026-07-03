@@ -1,4 +1,5 @@
 from django.urls import path
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from auth_tenancy.interfaces.api.views.auth_views import (
     RegisterUserView,
@@ -17,6 +18,7 @@ from auth_tenancy.interfaces.api.views.company_views import PublicCompanyListVie
 urlpatterns = [
     path("register/", RegisterUserView.as_view(), name="register-user"),
     path("login/", LoginUserView.as_view(), name="login-user"),
+    path("refresh/", TokenRefreshView.as_view(), name="refresh-token"),
     path("me/", MeView.as_view(), name="me"),
     path("users/", UserListView.as_view(), name="users"),
     path("users/<int:user_id>/", UserDetailView.as_view(), name="user-detail"),

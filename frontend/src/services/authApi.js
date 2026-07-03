@@ -1,6 +1,15 @@
 import { AUTH_API_ROUTES } from "../config/authApiRoutes.js";
 import { getStoredActiveCompanyId } from "../utils/authStorage.js";
 
+class AuthApiError extends Error {
+  constructor(message, { status, data } = {}) {
+    super(message);
+    this.name = "AuthApiError";
+    this.status = status ?? null;
+    this.data = data ?? null;
+  }
+}
+
 async function parseJsonResponse(response) {
   const contentType = response.headers.get("content-type");
 
@@ -13,6 +22,13 @@ async function parseJsonResponse(response) {
 
 function getErrorMessage(data, fallback) {
   return data?.detail || data?.email?.[0] || data?.password?.[0] || fallback;
+}
+
+function buildAuthApiError(response, data, fallback) {
+  return new AuthApiError(getErrorMessage(data, fallback), {
+    status: response.status,
+    data,
+  });
 }
 
 // Este helper será la base para futuras llamadas autenticadas.
@@ -62,7 +78,7 @@ export async function loginRequest({ email, password }) {
     const data = await parseJsonResponse(response);
 
     if (!response.ok) {
-      throw new Error(getErrorMessage(data, "Error al iniciar sesión"));
+      throw buildAuthApiError(response, data, "Error al iniciar sesión");
     }
 
     return data;
@@ -88,7 +104,7 @@ export async function getMeRequest(accessToken) {
     const data = await parseJsonResponse(response);
 
     if (!response.ok) {
-      throw new Error(getErrorMessage(data, "No se pudo recuperar la sesión"));
+      throw buildAuthApiError(response, data, "No se pudo recuperar la sesión");
     }
 
     return data;
@@ -96,6 +112,24 @@ export async function getMeRequest(accessToken) {
     console.error("Get Me request failed:", error);
     throw error;
   }
+}
+
+export async function refreshAccessTokenRequest(refreshToken) {
+  const response = await fetch(AUTH_API_ROUTES.refresh, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ refresh: refreshToken }),
+  });
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    throw buildAuthApiError(response, data, "No se pudo renovar la sesión");
+  }
+
+  return data;
 }
 
 export async function listCompaniesRequest(accessToken) {
@@ -111,7 +145,7 @@ export async function listCompaniesRequest(accessToken) {
   const data = await parseJsonResponse(response);
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(data, "No se pudieron cargar las empresas"));
+    throw buildAuthApiError(response, data, "No se pudieron cargar las empresas");
   }
 
   return Array.isArray(data) ? data : [];
@@ -144,7 +178,7 @@ export async function createCompanyRequest(
   const data = await parseJsonResponse(response);
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(data, "No se pudo crear la empresa"));
+    throw buildAuthApiError(response, data, "No se pudo crear la empresa");
   }
 
   return data;
@@ -163,7 +197,7 @@ export async function deleteCompanyRequest(accessToken, companyId) {
   const data = await parseJsonResponse(response);
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(data, "No se pudo eliminar la empresa"));
+    throw buildAuthApiError(response, data, "No se pudo eliminar la empresa");
   }
 
   return data;

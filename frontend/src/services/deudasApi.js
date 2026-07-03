@@ -241,3 +241,27 @@ export async function createProviderDebt({
 
   return data?.data;
 }
+
+export async function importAdminDebts({
+  accessToken,
+  companyId,
+  filename,
+  csvContent,
+}) {
+  const response = await fetch(`${ADMIN_DEBTS_BASE}/import`, {
+    method: "POST",
+    headers: authHeaders(accessToken, companyId),
+    body: JSON.stringify({
+      filename,
+      csvContent,
+    }),
+  });
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(data?.message || "No se pudo importar el archivo de deudas");
+  }
+
+  return data?.data;
+}

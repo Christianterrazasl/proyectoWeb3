@@ -2,13 +2,9 @@ const express = require("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
 const cors = require("cors");
 const morgan = require("morgan");
-const {
-  rewriteAdminCompaniesPath,
-  rewriteAdminServicesPath,
-} = require("./proxyConfig");
 
 const app = express();
-const PORT = 3000;
+const PORT = 3000; 
 
 app.use(cors());
 app.use(morgan("dev"));
@@ -47,7 +43,7 @@ app.get("/", (_req, res) => {
 // ---------------------------------------------------------
 const proxy = (target, pathRewrite) =>
   createProxyMiddleware({
-    target,
+    target, 
     changeOrigin: true,
     ...(pathRewrite ? { pathRewrite } : {}),
   });
@@ -86,11 +82,11 @@ app.use(
 // Catálogo admin (rutas explícitas antes del catch-all)
 app.use(
   "/api/admin/companies",
-  proxy("http://catalogo:3000", rewriteAdminCompaniesPath),
+  proxy("http://catalogo:3000", { "^/api/admin/companies": "/api/companies" }),
 );
 app.use(
   "/api/admin/services",
-  proxy("http://catalogo:3000", rewriteAdminServicesPath),
+  proxy("http://catalogo:3000", { "^/api/admin/services": "/api/services" }),
 );
 
 // Catálogo admin
@@ -119,7 +115,7 @@ app.use(
     onProxyRes(proxyRes) {
       const contentType = proxyRes.headers["content-type"] || "";
 
-      if (contentType.startsWith("text/html") && !contentType.includes("charset=")) {
+      if (contentType.startsWith("text/html") && !contentType.includes("charsesit=")) {
         proxyRes.headers["content-type"] = "text/html; charset=utf-8";
       }
     },

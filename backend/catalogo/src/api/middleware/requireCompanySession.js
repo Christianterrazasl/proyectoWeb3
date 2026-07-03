@@ -10,6 +10,10 @@ export function createRequireCompanySession({
 } = {}) {
   return async function requireCompanySession(req, res, next) {
     const authorization = req.header("authorization");
+    const requestedCompanyHeader = req.header("x-company-id");
+    const requestedCompanyId = requestedCompanyHeader
+      ? Number.parseInt(requestedCompanyHeader, 10)
+      : null;
 
     if (!authorization || !authorization.startsWith("Bearer ")) {
       return res.status(401).json({
@@ -20,7 +24,7 @@ export function createRequireCompanySession({
 
     const sessionResult = await fetchCurrentSessionFn({
       authorization,
-      companyId: null,
+      companyId: Number.isInteger(requestedCompanyId) ? requestedCompanyId : null,
     });
 
     if (!sessionResult.ok) {

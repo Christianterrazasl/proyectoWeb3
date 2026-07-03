@@ -7,6 +7,7 @@ const authApiBaseUrl = rawAuthApiUrl.endsWith("/")
 export const AUTH_API_ROUTES = Object.freeze({
   base: authApiBaseUrl,
   login: `${authApiBaseUrl}/login/`,
+  refresh: `${authApiBaseUrl}/refresh/`,
   register: `${authApiBaseUrl}/register/`,
   me: `${authApiBaseUrl}/me/`,
   users: `${authApiBaseUrl}/users/`,

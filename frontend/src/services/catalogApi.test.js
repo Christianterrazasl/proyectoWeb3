@@ -26,14 +26,32 @@ test("syncProviderCatalog only syncs the real catalog company record", async () 
   await syncProviderCatalog("token-1", {
     companyId: 5,
     name: "Empresa Real",
+    nit: "NIT-555",
   });
 
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.equal(calls[0].url, "/api/admin/companies");
   assert.equal(calls[0].init.method, "POST");
   assert.deepEqual(JSON.parse(calls[0].init.body), {
     id: "5",
     name: "Empresa Real",
+    nit: "NIT-555",
+  });
+  assert.equal(calls[1].url, "/api/admin/services");
+  assert.deepEqual(JSON.parse(calls[1].init.body), {
+    id: "empresa-real",
+    companyId: 5,
+    name: "Empresa Real",
+    inputSchema: {
+      fields: [
+        {
+          name: "customerRef",
+          type: "string",
+          label: "Documento",
+          required: true,
+        },
+      ],
+    },
   });
 });
 
@@ -60,7 +78,7 @@ test("listCompanyCatalogServices requests company-scoped real services", async (
   assert.deepEqual(result, [{ serviceId: "agua" }]);
 });
 
-test("listProviderCatalogServices requests only the authenticated company scope", async () => {
+test("listProviderCatalogServices requests the active provider company scope explicitly", async () => {
   let requestUrl = null;
   let requestInit = null;
 
@@ -76,11 +94,11 @@ test("listProviderCatalogServices requests only the authenticated company scope"
     });
   };
 
-  const result = await listProviderCatalogServices("token-provider");
+  const result = await listProviderCatalogServices("token-provider", 21);
 
   assert.equal(requestUrl, "/api/catalog/company/services");
   assert.equal(requestInit.headers.Authorization, "Bearer token-provider");
-  assert.equal("X-Company-Id" in requestInit.headers, false);
+  assert.equal(requestInit.headers["X-Company-Id"], "21");
   assert.deepEqual(result, [{ serviceId: "energia" }]);
 });
 
@@ -126,6 +144,16 @@ test("createCatalogService sends only real service data for valid names", async 
     id: "agua-potable",
     companyId: 9,
     name: "Agua Potable",
+    inputSchema: {
+      fields: [
+        {
+          name: "customerRef",
+          type: "string",
+          label: "Documento",
+          required: true,
+        },
+      ],
+    },
   });
 });
 

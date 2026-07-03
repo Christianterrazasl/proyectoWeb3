@@ -9,19 +9,11 @@ import {
   buildAdminDebtPayload,
   buildCatalogServiceOptions,
 } from "./adminDebtPanelModel";
-
-function mapDebtToRow(debt) {
-  const status = String(debt.status || "").toUpperCase();
-
-  return {
-    id: debt.id,
-    documento: debt.customerRef,
-    concepto: debt.serviceId,
-    monto: debt.amount,
-    fecha: debt.dueDate ? String(debt.dueDate).slice(0, 10) : "—",
-    estado: status === "PAID" ? "pagada" : "pendiente",
-  };
-}
+import {
+  buildProviderCompanyOptions,
+  getProviderScopedEmptyState,
+  mapProviderDebtToRow,
+} from "./providerPanelModel";
 
 const ProveedorPage = () => {
   const [documento, setDocumento] = useState("");
@@ -36,7 +28,15 @@ const ProveedorPage = () => {
   const [mensaje, setMensaje] = useState("");
 
   const navigate = useNavigate();
-  const { logout, session, activeCompanyId, activeCompany } = useAuth();
+  const {
+    logout,
+    session,
+    accessibleCompanies,
+    activeCompanyId,
+    activeCompany,
+    setActiveCompany,
+  } = useAuth();
+  const companyOptions = buildProviderCompanyOptions(accessibleCompanies);
 
   const loadDebts = useCallback(async () => {
     if (!session?.access || !activeCompanyId) {
@@ -51,7 +51,8 @@ const ProveedorPage = () => {
         accessToken: session.access,
         companyId: activeCompanyId,
       });
-      setDeudas(rows.map(mapDebtToRow));
+      setDeudas(rows.map(mapProviderDebtToRow));
+      setMensaje("");
     } catch (error) {
       setMensaje(error.message || "No se pudieron cargar las deudas");
       setDeudas([]);
@@ -73,7 +74,10 @@ const ProveedorPage = () => {
       }
 
       try {
-        const services = await listProviderCatalogServices(session.access);
+        const services = await listProviderCatalogServices(
+          session.access,
+          activeCompanyId,
+        );
         const options = buildCatalogServiceOptions(services);
 
         setCatalogServiceOptions(options);
@@ -82,6 +86,7 @@ const ProveedorPage = () => {
             ? currentValue
             : (options[0]?.id ?? ""),
         );
+        setMensaje("");
       } catch (error) {
         setCatalogServiceOptions([]);
         setSelectedServiceId("");
@@ -152,6 +157,19 @@ const ProveedorPage = () => {
               <h1 className="lumina-headline text-slate-100">
                 {activeCompany?.name || "Proveedor"}
               </h1>
+              {companyOptions.length > 0 ? (
+                <select
+                  className="lumina-input mt-4 max-w-md"
+                  value={activeCompanyId ?? ""}
+                  onChange={(event) => setActiveCompany(event.target.value)}
+                >
+                  {companyOptions.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.label}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
             </div>
             <div className="flex gap-3">
               <Link to="/" className="lumina-button-secondary">
@@ -285,7 +303,12 @@ const ProveedorPage = () => {
                     </div>
                   ))
                 ) : (
-                  <p className="text-center text-sm text-slate-200">Sin deudas</p>
+                  <p className="text-center text-sm text-slate-200">
+                    {getProviderScopedEmptyState({
+                      activeCompanyName: activeCompany?.name,
+                      tab,
+                    })}
+                  </p>
                 )}
               </div>
             )}

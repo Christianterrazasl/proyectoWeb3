@@ -7,7 +7,7 @@ import {
   saveActiveCompanyId,
   saveAuthSession,
 } from "../utils/authStorage";
-import { getMeRequest } from "../services/authApi";
+import { getMeRequest, refreshAccessTokenRequest } from "../services/authApi";
 import { getActiveCompany } from "../utils/tenancyUi";
 import { AuthContext } from "./auth-context";
 
@@ -133,20 +133,44 @@ export function AuthProvider({ children }) {
     });
   };
 
-  const refreshSession = useCallback(async () => {
+  const refreshSession = useCallback(async ({ preferredCompanyId = null } = {}) => {
     const access = getAccessToken();
     const refresh = getRefreshToken();
 
-    if (!access || !refresh) {
+    if (preferredCompanyId !== null && preferredCompanyId !== undefined) {
+      saveActiveCompanyId(preferredCompanyId);
+    }
+
+    if (!refresh) {
       logout();
       return;
     }
 
-    const meData = await getMeRequest(access);
+    let nextAccess = access;
+    let nextRefresh = refresh;
+    let meData = null;
+
+    try {
+      if (!nextAccess) {
+        throw Object.assign(new Error("Missing access token"), { status: 401 });
+      }
+
+      meData = await getMeRequest(nextAccess);
+    } catch (error) {
+      if (error?.status !== 401) {
+        throw error;
+      }
+
+      const refreshedSession = await refreshAccessTokenRequest(refresh);
+      nextAccess = refreshedSession.access;
+      nextRefresh = refreshedSession.refresh || refresh;
+      meData = await getMeRequest(nextAccess);
+    }
+
     const nextAuthState = buildAuthState(meData);
 
-    saveAuthSession({ access, refresh, user: meData });
-    setSession({ access, refresh });
+    saveAuthSession({ access: nextAccess, refresh: nextRefresh, user: meData });
+    setSession({ access: nextAccess, refresh: nextRefresh });
     setAuthState(nextAuthState);
   }, [logout]);
 

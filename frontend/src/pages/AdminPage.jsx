@@ -16,10 +16,17 @@ import {
   createAdminProvider,
   createProviderDebt,
   deleteAdminProvider,
+  importAdminDebts,
   listAdminProviders,
   listProviderDebts,
 } from "../services/deudasApi";
 import {
+  downloadAdminCompaniesCsv,
+  downloadAdminCompaniesXlsx,
+  downloadAdminServicesCsv,
+  downloadAdminServicesXlsx,
+  downloadAdminTransactionsCsv,
+  downloadAdminTransactionsXlsx,
   getCompanyPortfolioSummary,
   getDashboardSummary,
   getTransactionMonitoring,
@@ -30,6 +37,13 @@ import {
   filterAdminDebtRows,
   mapAdminDebtToRow,
 } from "./adminDebtPanelModel";
+import {
+  buildAdminExportActions,
+  buildAdminExportSuccessMessage,
+  buildAdminDebtImportSuccessMessage,
+  getAdminEmptyState,
+  readAdminDebtImportFile,
+} from "./adminClosureModel";
 import {
   buildAdminProviderRows,
   buildCreateProviderNit,
@@ -46,12 +60,23 @@ function formatDateTime(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString("es-BO");
 }
 
+const ADMIN_EXPORT_DOWNLOADERS = {
+  "companies-csv": downloadAdminCompaniesCsv,
+  "companies-xlsx": downloadAdminCompaniesXlsx,
+  "services-csv": downloadAdminServicesCsv,
+  "services-xlsx": downloadAdminServicesXlsx,
+  "transactions-csv": downloadAdminTransactionsCsv,
+  "transactions-xlsx": downloadAdminTransactionsXlsx,
+};
+
 const AdminPage = () => {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
   const [portfolioRows, setPortfolioRows] = useState([]);
   const [transactionRows, setTransactionRows] = useState([]);
   const [dashboardError, setDashboardError] = useState("");
+  const [reportFeedback, setReportFeedback] = useState("");
+  const [exportingReportKey, setExportingReportKey] = useState("");
   const [documento, setDocumento] = useState("");
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [monto, setMonto] = useState("");
@@ -59,6 +84,8 @@ const AdminPage = () => {
   const [debtRows, setDebtRows] = useState([]);
   const [debtTab, setDebtTab] = useState("pendientes");
   const [debtFeedback, setDebtFeedback] = useState("");
+  const [debtImportFile, setDebtImportFile] = useState(null);
+  const [debtImportInputKey, setDebtImportInputKey] = useState(0);
   const [debtLoading, setDebtLoading] = useState(false);
   const [debtSubmitting, setDebtSubmitting] = useState(false);
   const [catalogServiceOptions, setCatalogServiceOptions] = useState([]);
@@ -94,6 +121,7 @@ const AdminPage = () => {
     () => providerRows.filter((provider) => provider.active && provider.providerActive),
     [providerRows],
   );
+  const adminExportActions = useMemo(() => buildAdminExportActions(), []);
 
   const loadCatalogServices = useCallback(async () => {
     if (!session?.access || !activeCompanyId) {
@@ -143,7 +171,7 @@ const AdminPage = () => {
     }
   }, [session?.access]);
 
-  const loadAdminDebts = useCallback(async () => {
+  const loadAdminDebts = useCallback(async ({ preserveFeedback = false } = {}) => {
     if (!session?.access || !activeCompanyId) {
       setDebtRows([]);
       return;
@@ -157,7 +185,9 @@ const AdminPage = () => {
         companyId: activeCompanyId,
       });
       setDebtRows(rows.map(mapAdminDebtToRow));
-      setDebtFeedback("");
+      if (!preserveFeedback) {
+        setDebtFeedback("");
+      }
     } catch (error) {
       setDebtRows([]);
       setDebtFeedback(error.message || "No se pudieron cargar las deudas");
@@ -250,6 +280,7 @@ const AdminPage = () => {
         await syncProviderCatalog(session.access, {
           companyId: company.id,
           name: company.name,
+          nit: company.nit,
         });
       } catch (catalogError) {
         console.warn("Catalog sync failed:", catalogError);
@@ -258,7 +289,10 @@ const AdminPage = () => {
       setProviderName("");
       setProviderDescription("");
       setProviderFeedback("Proveedor creado");
-      await Promise.all([loadAdminProviders(), refreshSession()]);
+      await Promise.all([
+        loadAdminProviders(),
+        refreshSession({ preferredCompanyId: company.id }),
+      ]);
     } catch (error) {
       setProviderFeedback(error.message || "No se pudo crear el proveedor");
     } finally {
@@ -328,11 +362,73 @@ const AdminPage = () => {
       setFecha("");
       setDebtTab("pendientes");
       setDebtFeedback("Deuda creada");
-      await loadAdminDebts();
+      await loadAdminDebts({ preserveFeedback: true });
     } catch (error) {
       setDebtFeedback(error.message || "No se pudo crear la deuda");
     } finally {
       setDebtSubmitting(false);
+    }
+  };
+
+  const handleImportDebts = async (event) => {
+    event.preventDefault();
+
+    if (!session?.access || !activeCompanyId) {
+      setDebtFeedback("Selecciona una empresa");
+      return;
+    }
+
+    setDebtSubmitting(true);
+    setDebtFeedback("");
+
+    try {
+      const payload = await readAdminDebtImportFile(debtImportFile);
+      const result = await importAdminDebts({
+        accessToken: session.access,
+        companyId: activeCompanyId,
+        ...payload,
+      });
+
+      await loadAdminDebts({ preserveFeedback: true });
+      setDebtTab("pendientes");
+      setDebtImportFile(null);
+      setDebtImportInputKey((currentValue) => currentValue + 1);
+      setDebtFeedback(buildAdminDebtImportSuccessMessage(result));
+    } catch (error) {
+      setDebtFeedback(error.message || "No se pudo importar el archivo de deudas");
+    } finally {
+      setDebtSubmitting(false);
+    }
+  };
+
+  const handleAdminExport = async (exportKey) => {
+    if (!session?.access || !activeCompanyId) {
+      setReportFeedback("Selecciona una empresa");
+      return;
+    }
+
+    const downloadExport = ADMIN_EXPORT_DOWNLOADERS[exportKey];
+
+    if (!downloadExport) {
+      setReportFeedback("La exportación solicitada no está disponible");
+      return;
+    }
+
+    setExportingReportKey(exportKey);
+    setReportFeedback("");
+
+    try {
+      const result = await downloadExport(session.access, activeCompanyId);
+      setReportFeedback(
+        buildAdminExportSuccessMessage({
+          filename: result.filename,
+          activeCompanyName: activeCompany?.name,
+        }),
+      );
+    } catch (error) {
+      setReportFeedback(error.message || "No se pudo exportar el reporte");
+    } finally {
+      setExportingReportKey("");
     }
   };
 
@@ -413,6 +509,40 @@ const AdminPage = () => {
           </div>
         </section>
 
+        <section className="mt-6">
+          <article className="lumina-shell">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="lumina-title text-slate-100">Exportes de cierre</h2>
+                <p className="mt-2 text-sm text-slate-300">
+                  Descarga empresas, servicios y transacciones con la empresa activa,
+                  usando los endpoints reales de reportes.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {adminExportActions.map((action) => (
+                  <button
+                    key={action.key}
+                    type="button"
+                    className="lumina-button-secondary"
+                    onClick={() => handleAdminExport(action.key)}
+                    disabled={exportingReportKey === action.key}
+                  >
+                    {exportingReportKey === action.key
+                      ? "Exportando..."
+                      : action.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {reportFeedback ? (
+              <div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+                {reportFeedback}
+              </div>
+            ) : null}
+          </article>
+        </section>
+
         <section className="mt-6 grid gap-6 xl:grid-cols-2">
           <article className="lumina-shell">
             <h2 className="lumina-title text-slate-100">
@@ -425,6 +555,35 @@ const AdminPage = () => {
               </div>
             ) : (
               <form className="mt-6 flex flex-col gap-4" onSubmit={handleCreateDebt}>
+                <div className="rounded-3xl border border-cyan-400/20 bg-slate-950/35 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <label className="flex-1 text-sm text-slate-200">
+                      <span className="mb-2 block font-medium text-slate-100">
+                        Importar deudas desde CSV
+                      </span>
+                      <input
+                        key={debtImportInputKey}
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="lumina-input"
+                        onChange={(event) =>
+                          setDebtImportFile(event.target.files?.[0] || null)
+                        }
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="lumina-button-secondary"
+                      onClick={handleImportDebts}
+                      disabled={debtSubmitting}
+                    >
+                      Importar CSV
+                    </button>
+                  </div>
+                  <p className="mt-3 text-sm text-slate-300">
+                    Usa el contrato actual del backend: <code>filename</code> + <code>csvContent</code>. La importación respeta la empresa activa y recarga el listado al terminar.
+                  </p>
+                </div>
                 <input
                   type="text"
                   value={documento}
@@ -439,7 +598,12 @@ const AdminPage = () => {
                   disabled={catalogServiceOptions.length === 0}
                 >
                   {catalogServiceOptions.length === 0 ? (
-                    <option value="">Sin servicios reales en catálogo</option>
+                    <option value="">
+                      {getAdminEmptyState({
+                        section: "services",
+                        activeCompanyName: activeCompany?.name,
+                      })}
+                    </option>
                   ) : null}
                   {catalogServiceOptions.map((service) => (
                     <option key={service.id} value={service.id}>
@@ -525,7 +689,13 @@ const AdminPage = () => {
                     </div>
                   ))
                 ) : (
-                  <p className="text-center text-sm text-slate-200">Sin deudas</p>
+                  <p className="text-center text-sm text-slate-200">
+                    {getAdminEmptyState({
+                      section: "debts",
+                      activeCompanyName: activeCompany?.name,
+                      debtTab,
+                    })}
+                  </p>
                 )}
               </div>
             )}
@@ -619,7 +789,7 @@ const AdminPage = () => {
                   ))
                 ) : (
                   <p className="text-center text-sm text-slate-200">
-                    Sin proveedores activos
+                    {getAdminEmptyState({ section: "providers" })}
                   </p>
                 )}
               </div>
@@ -646,7 +816,12 @@ const AdminPage = () => {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-slate-200">Sin datos</p>
+                <p className="text-sm text-slate-200">
+                  {getAdminEmptyState({
+                    section: "portfolio",
+                    activeCompanyName: activeCompany?.name,
+                  })}
+                </p>
               )}
             </div>
           </article>
@@ -668,7 +843,12 @@ const AdminPage = () => {
                 </div>
               ))}
               {transactionRows.length === 0 ? (
-                <p className="text-sm text-slate-200">Sin transacciones</p>
+                <p className="text-sm text-slate-200">
+                  {getAdminEmptyState({
+                    section: "transactions",
+                    activeCompanyName: activeCompany?.name,
+                  })}
+                </p>
               ) : null}
             </div>
           </article>

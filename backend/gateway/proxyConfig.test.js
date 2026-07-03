@@ -13,6 +13,10 @@ test("rewriteAdminCompaniesPath conserva el sufijo company/services", () => {
   );
 });
 
+test("rewriteAdminCompaniesPath preserves root admin companies collection", () => {
+  assert.equal(rewriteAdminCompaniesPath("/"), "/api/companies/");
+});
+
 test("rewriteAdminServicesPath reescribe el listado admin al contrato runtime", () => {
   assert.equal(rewriteAdminServicesPath("/"), "/api/services/");
 });

@@ -53,12 +53,11 @@ class Command(BaseCommand):
                 },
             )
 
-        nur = CompanyModel.objects.get(id=1)
-
-        MembershipModel.objects.get_or_create(
-            user=provider,
-            company=nur,
-            defaults={"company_role": "provider", "active": True},
-        )
+        for company_data in DEMO_COMPANIES:
+            MembershipModel.objects.update_or_create(
+                user=provider,
+                company_id=company_data["id"],
+                defaults={"company_role": "provider", "active": True},
+            )
 
         self.stdout.write(self.style.SUCCESS("Demo auth & tenancy data created successfully."))

@@ -22,6 +22,19 @@ function adminAuthHeaders(accessToken) {
   };
 }
 
+function buildDefaultServiceInputSchema() {
+  return {
+    fields: [
+      {
+        name: "customerRef",
+        type: "string",
+        label: "Documento",
+        required: true,
+      },
+    ],
+  };
+}
+
 function slugifyServiceId(value) {
   const slug = String(value || "")
     .trim()
@@ -33,13 +46,14 @@ function slugifyServiceId(value) {
   return slug;
 }
 
-export async function createCatalogCompany(accessToken, { id, name }) {
+export async function createCatalogCompany(accessToken, { id, name, nit }) {
   const response = await fetch(`${ADMIN_CATALOG_BASE}/companies`, {
     method: "POST",
     headers: adminAuthHeaders(accessToken),
     body: JSON.stringify({
       id: String(id),
       name,
+      nit,
     }),
   });
 
@@ -66,6 +80,7 @@ export async function createCatalogService(accessToken, { companyId, name }) {
       id: serviceId,
       companyId: Number(companyId),
       name,
+      inputSchema: buildDefaultServiceInputSchema(),
     }),
   });
 
@@ -95,13 +110,13 @@ export async function listAdminCompanyCatalogServices(accessToken, companyId) {
   return data?.data ?? data ?? [];
 }
 
-export async function listProviderCatalogServices(accessToken) {
+export async function listProviderCatalogServices(accessToken, companyId) {
   const response = await fetch(
     `${COMPANY_CATALOG_BASE}/company/services`,
     buildAuthenticatedRequestInit({
       method: "GET",
       accessToken,
-      companyId: null,
+      companyId,
     }),
   );
 
@@ -116,9 +131,17 @@ export async function listProviderCatalogServices(accessToken) {
 
 export const listCompanyCatalogServices = listAdminCompanyCatalogServices;
 
-export async function syncProviderCatalog(accessToken, { companyId, name }) {
+export async function syncProviderCatalog(accessToken, { companyId, name, nit }) {
   try {
-    await createCatalogCompany(accessToken, { id: companyId, name });
+    await createCatalogCompany(accessToken, { id: companyId, name, nit });
+  } catch (error) {
+    if (!/exist|duplicate|ya existe/i.test(error.message)) {
+      throw error;
+    }
+  }
+
+  try {
+    await createCatalogService(accessToken, { companyId, name });
   } catch (error) {
     if (!/exist|duplicate|ya existe/i.test(error.message)) {
       throw error;

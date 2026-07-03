@@ -5,6 +5,7 @@ import {
   createProviderDebt,
   getAdminDebtsUrl,
   getProviderCustomerDebts,
+  importAdminDebts,
   listProviderDebts,
   searchDebtsLookup,
 } from "./deudasApi.js";
@@ -184,4 +185,111 @@ test("createProviderDebt posts admin debt payload with auth and tenant context",
     dueDate: "2026-07-15T00:00:00.000Z",
   });
   assert.deepEqual(result, { id: 99 });
+});
+
+test("createProviderDebt keeps the active company as tenant fallback on provider writes", async () => {
+  let requestInit = null;
+
+  globalThis.fetch = async (_url, init) => {
+    requestInit = init;
+
+    return new Response(JSON.stringify({ data: { id: 100 } }), {
+      status: 201,
+      headers: {
+        "content-type": "application/json",
+      },
+    });
+  };
+
+  await createProviderDebt({
+    accessToken: "token-abc",
+    companyId: 77,
+    tenantId: "",
+    serviceId: "agua",
+    customerRef: "998877",
+    period: "2026-08",
+    amount: 35,
+    dueDate: "2026-08-01T00:00:00.000Z",
+  });
+
+  assert.equal(requestInit.headers["X-Company-Id"], "77");
+  assert.equal(JSON.parse(requestInit.body).tenantId, "77");
+});
+
+test("importAdminDebts posts the CSV payload with auth and company scope", async () => {
+  let requestUrl = null;
+  let requestInit = null;
+
+  globalThis.fetch = async (url, init) => {
+    requestUrl = url;
+    requestInit = init;
+
+    return new Response(JSON.stringify({
+      data: {
+        importId: "7",
+        filename: "deudas-junio.csv",
+        totalRecords: 2,
+        importedRecords: 2,
+        status: "COMPLETED",
+      },
+    }), {
+      status: 201,
+      headers: {
+        "content-type": "application/json",
+      },
+    });
+  };
+
+  const result = await importAdminDebts({
+    accessToken: "token-import",
+    companyId: 42,
+    filename: "deudas-junio.csv",
+    csvContent: "tenantId,serviceId\n1,agua",
+  });
+
+  assert.equal(requestUrl, "/api/admin/debts/import");
+  assert.equal(requestInit.method, "POST");
+  assert.equal(requestInit.headers.Authorization, "Bearer token-import");
+  assert.equal(requestInit.headers["X-Company-Id"], "42");
+  assert.deepEqual(JSON.parse(requestInit.body), {
+    filename: "deudas-junio.csv",
+    csvContent: "tenantId,serviceId\n1,agua",
+  });
+  assert.deepEqual(result, {
+    importId: "7",
+    filename: "deudas-junio.csv",
+    totalRecords: 2,
+    importedRecords: 2,
+    status: "COMPLETED",
+  });
+});
+
+test("importAdminDebts preserves backend rejection messages", async () => {
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        success: false,
+        message: "La fila 2 es inválida: monto incorrecto",
+      }),
+      {
+        status: 400,
+        headers: {
+          "content-type": "application/json",
+        },
+      },
+    );
+
+  await assert.rejects(
+    async () =>
+      importAdminDebts({
+        accessToken: "token-import",
+        companyId: 42,
+        filename: "deudas-invalidas.csv",
+        csvContent: "tenantId,serviceId\n1,agua",
+      }),
+    (error) => {
+      assert.match(error.message, /fila 2.*monto incorrecto/i);
+      return true;
+    },
+  );
 });
